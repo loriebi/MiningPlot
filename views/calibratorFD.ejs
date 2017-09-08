@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+
+<title> <%= title %> </title>
+
+<head>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<!-- Adding Google Analytics to monitor site views. -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-65904265-3', 'auto');
+  ga('send', 'pageview');
+
+</script>
+<body>
+
+<div id="plotdiv"><!-- Plotly chart will be drawn inside this DIV --></div>
+<script>
+  <!-- JAVASCRIPT CODE GOES HERE -->
+
+  var d3 = Plotly.d3;
+
+  var WIDTH_IN_PERCENT_OF_PARENT = 100, HEIGHT_IN_PERCENT_OF_PARENT = 90;
+
+  var gd3 = d3.select('#plotdiv')
+          .style({
+            width: WIDTH_IN_PERCENT_OF_PARENT + '%',
+            'margin-left': (100 - WIDTH_IN_PERCENT_OF_PARENT) / 2 + '%',
+
+            height: HEIGHT_IN_PERCENT_OF_PARENT + 'vh',
+            'margin-top': (100 - HEIGHT_IN_PERCENT_OF_PARENT) / 2 + 'vh'
+          });
+
+  var gd = gd3.node();
+  var data = [];
+  var layout;
+
+  window.onresize = function() {
+    setBarPlot();
+  };
+
+  var calibratorsData = <%- JSON.stringify(calibrators) %>;
+  var calibratorsFD = <%- JSON.stringify(calibratorsFD) %>;
+  var calibratorFD = <%- JSON.stringify(query) %>;
+  var calibratorName;
+
+  //console.log()
+
+  if (calibratorFD.hasOwnProperty("calibrator")) {
+    calibratorName = decodeURI(calibratorFD.calibrator.replace(";709;", "+"));
+  }
+  else
+    throw new Error("Calibrator name not passed as parameter");
+
+
+  var calibratorsNum = calibratorsData["almaName"].length;
+  var freqSupsAll = [];
+  var calibratorIndex = calibratorsData["almaName"].indexOf(calibratorName);
+
+  if (calibratorIndex < 0) {
+    throw new Error("Calibrator not found in database: " + calibratorName);
+  }
+
+  calibratorsNum = 1;
+  var tickText = ["", calibratorName, ""];
+  var tickVals = [0];
+
+  for (var i = 0; i < calibratorsFD.length; i += 2) {
+
+    tickVals.push(tickVals[tickVals.length-1] + calibratorsFD[i][calibratorIndex]);
+    tickVals.push(tickVals[tickVals.length-1] + calibratorsFD[i+1][calibratorIndex]);
+
+    var trace2a = {
+      x:  [0, calibratorsFD[i][calibratorIndex], 0],
+      orientation: "h",
+      hoverinfo: "none",
+      type: 'bar',
+      marker: {
+        color: 'rgba(1, 1, 1, 0.0)'
+      }
+    };
+
+    data.push(trace2a);
+
+    var trace2b = {
+      x: [0, calibratorsFD[i + 1][calibratorIndex],  0],
+      type: 'bar',
+      hoverinfo: "text",
+      text: tickText,
+      orientation: "h",
+      marker: {
+        color: 'rgba(0, 255, 0, 0.7)',
+        line: {
+          color: 'rgba(0, 255, 0, 1.0)',
+          width: 1
+        }
+      }
+    };
+
+    data.push(trace2b);
+  }
+
+  var bands = [[84, 116], [125, 163], [211, 275], [275, 373], [385, 500], [602, 720]];
+
+  for (var i in bands) {
+
+    var band = {
+      x:         [bands[i][0], bands[i][1], bands[i][1], bands[i][0], bands[i][0]],
+      y:         [calibratorsNum+1, calibratorsNum+1, 0, 0, calibratorsNum+1],
+      fill:      'tozeroy',
+      fillcolor: 'rgba(0, 0, 255, 0.2)',
+      line: {
+        color: 'rgba(0, 0, 255, 0.5)',
+        width: 1
+      },
+      type:      'scatter',
+      mode:      'lines',
+      name:      'NOEMA'
+    };
+
+    data.push(band);
+  }
+
+  var bandsLabels =["Band 3", "Band 4", "Band 6", "Band 7", "Band 8", "Band 9"];
+
+  var annotations = [];
+
+  for (var i = 0 ; i < bands.length ; ++i) {
+    var x = (bands[i][0] + bands[i][1]) / 2;
+    var result = {
+      x: x,
+      y: 0.1,
+      text: bandsLabels[i],
+      font: {
+        family: 'Arial',
+        size: 20,
+        color: 'rgba(245, 0, 0, 0.3)'
+      },
+      showarrow: false
+    };
+    annotations.push(result);
+  }
+
+  var range = Array.apply(null, Array(3)).map(function (x, i) {
+    return i;
+  });
+
+  function setBarPlot() {
+    layout = {
+      xaxis:         {
+        ticks:    "inside",
+        mirror:   "ticks",
+        tickmode: 'array',
+        ticktext: tickVals,
+        tickvals: tickVals,
+        tickangle: 45,
+        showgrid: true,
+        showline: true,
+        range:    [tickVals[1]-50, tickVals[tickVals.length-1]+50],
+        title:    'Frequency [Ghz]'
+      },
+      yaxis:         {
+        ticks:    "inside",
+        mirror:   "ticks",
+        tickmode: 'array',
+        ticktext: tickText,
+        tickvals: range,
+        tickangle: -90,
+        tickfont: { size: 25 },
+        showgrid: true,
+        showline: true,
+        range:    [0, calibratorsNum + 1],
+        title:    'Calibrator'
+      },
+      title:         'Distribution of ALMA frequencies for calibrators (2010-2016)',
+      barmode:       'stack',
+      paper_bgcolor: 'rgba(245,246,249,1)',
+      plot_bgcolor:  'rgba(245,246,249,1)',
+      showlegend:    false,
+      hovermode:     "closest",
+      annotations: annotations
+    };
+
+    Plotly.newPlot(gd, data, layout);
+  }
+
+  setBarPlot();
+
+</script>
+</body>
+
+</html>

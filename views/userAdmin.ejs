@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<title> <%= title %> </title>
+
+<head>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+
+  <!-- jQuery library -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+
+  <!-- Latest compiled JavaScript -->
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+  <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.15/css/jquery.dataTables.css">
+
+  <script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.15/js/jquery.dataTables.js"></script>
+
+  <!-- Adding Google Analytics to monitor site views. -->
+  <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-65904265-3', 'auto');
+  ga('send', 'pageview');
+
+  </script>
+  <!-- bootbox code -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/4.4.0/bootbox.min.js"></script>
+</head>
+
+<body>
+
+  <header>
+    <% include ./partials/header %>
+  </header>
+
+  <h1> <%= title %> </h1>
+
+  <% if (user.status != "crew") { %>
+    Your status '<%= user.status %>' does not give you access to the administration of Artemix users.
+    <% } %>
+
+    <% if (user.status == "crew") { %>
+      <form action="/userAdmin" method="post">
+        <p align="middle"><button type='submit', class='btn btn-link'>Apply</button> <a href="/userAdmin" class="btn btn-link" role="button">Cancel</a></p>
+        <table id="users" class="table table-striped">
+          <thead>
+            <tr> <th> Email </th> <th> Institution </th> <th> Status </th> <th> Active </th> <th> Last login </th> <th> Number of login </th> <th>&nbsp;</th></tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function (user) {  %>
+              <tr>
+                <td> <input type="hidden" name="email" value="<%= user.email%>" /> <%= user.email%> </td>
+                <td> <%= user.institution %> </td>
+                <td>
+                  <select name="status">
+                    <option value="crew" <% if (user.status == "crew") { %> selected <% } %> > crew </option>
+                    <option value="passenger" <% if (user.status == "passenger") { %> selected <% } %> > passenger </option>
+                  </select>
+                </td>
+                <td>
+                  <select name="active">
+                    <option value="true" <% if (user.active) { %> selected <% } %> > true </option>
+                    <option value="false" <% if (!user.active) { %> selected <% } %> > false </option>
+                  </select>
+                </td>
+                <td>
+                  <%= user.lastLogin  %>
+                </td>
+		<td>
+		  <%= user.numberOfLogin %>
+		</td>
+                <td align="middle">
+			<button user-id="<%=user.email%>" id="remove" type="button" class="btn btn-danger remove">
+          			<span class="glyphicon glyphicon-remove"></span> Remove 
+        		</button>
+                </td>
+              </tr>
+              <% }); %>
+            </tbody>
+          </table>
+	  <p align="middle"><button type='submit', class='btn btn-link'>Apply</button> <a href="/userAdmin" class="btn btn-link" role="button">Cancel</a></p>
+
+        </form>
+
+        <% } %>
+	<script>
+    		$(document).on("click", ".remove", function(e) {
+                        var user2delete = $(this).attr("user-id");
+        		bootbox.confirm("Are you sure you want to remove " + user2delete + " ?", function(result) {
+            			if(result){
+	                                window.location = "/userAdmin?delete="+user2delete;
+            			}
+        		}); 
+    		});
+	       $(document).ready( function () { $('#users').DataTable();} );
+        </script>
+      </body>
+
+      </html>

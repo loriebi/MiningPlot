@@ -1,0 +1,19 @@
+#modalBodyForm{
+    width:50%;
+    margin:0 auto;
+}
+
+#modalBodyForm *{
+    font-size: 13px;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+select{
+    width:50%;
+    margin:0 auto;
+}
+
+.select2 * {
+    z-index : 5000;
+}

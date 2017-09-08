@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html>
+
+<title> <%= title %> </title>
+
+<head>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+  <script src="/javascripts/bootstrap.min.js"></script>
+  <!-- Adding Google Analytics to monitor site views. -->
+  <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+              (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-65904265-3', 'auto');
+      ga('send', 'pageview');
+
+  </script>
+  <link rel="stylesheet" type="text/css" href="/stylesheets/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="/stylesheets/loader.css">
+
+
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.full.js"></script>
+
+  <link rel="stylesheet" type="text/css" href="/stylesheets/style.css">
+
+</head>
+
+<body>
+
+<header>
+    <% include ./partials/header %>
+</header>
+<div class="loading:before" id="loadingId"></div>
+<div class="modal fade" id="searchModalId" role="dialog" aria-labelledby="searchModalLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title"  id="searchModalLabel">Search</h4>
+      </div>
+      <div class="modal-body" id="searchModalBodyId">
+        <form id="modalBodyForm">
+          <select id="headersList" placeholder="alma-name" style="width:284.01px;">
+            <option></option>
+          </select>
+          <input type="text" class="form-control input-sm" name="Name" id="name" placeholder="sesame-name" style="height:28px;"> OR</br>
+          <input type="text" class="form-control input-sm" name="HMS" id="hms" placeholder="HH:MM:SS" style="height:28px;">
+          <input type="text" class="form-control input-sm" name="DMS" id="dms" placeholder="DD:MM:SS" style="height:28px;">
+          <input type="text" class="form-control input-sm" name="Arcmin" id="arcmin" placeholder="arcmin (default 10)" style="height:28px;"> OR</br>
+          <select id="projectList" placeholder="project code" style="width:284.01px;">
+            <option></option>
+          </select>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" id="searchButtonId">Search</button>
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="showcase__section" id="bubble">
+  </br>
+  <!--div style="display: inline-block; margin-left: 5%;">
+    <form onsubmit="buttonClick(); return false;">
+      Search by:
+      <input type="text" name="Name" id="name" placeholder="sesame-name"> or
+      <input type="text" name="Alma-name" id="alma-name" placeholder="alma-name">
+      <input type="text" name="Arcmin" id="arcmin" placeholder="arcmin"> or
+      <input type="text" name="Project code" id="projCode" placeholder="project code">
+      <input type="submit" name="Search" id="search" value="Search">
+    </form>
+  </div-->
+  <div id="bubbleplots">
+    <div class="bubbleplot">
+      <div class="plot" id="plotdiv"></div>
+      <div class="control-row" style="display: inline-block;">
+        <!-- Band: <select class="band">
+        </select> -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    <!-- JAVASCRIPT CODE GOES HERE -->
+
+    var searchClicked = false;
+
+    var d3 = Plotly.d3;
+
+    var WIDTH_IN_PERCENT_OF_PARENT = 100, HEIGHT_IN_PERCENT_OF_PARENT = 90;
+
+    var gd3 = d3.select('#plotdiv')
+        .style({
+            width: WIDTH_IN_PERCENT_OF_PARENT + '%',
+            'margin-left': (100 - WIDTH_IN_PERCENT_OF_PARENT) / 2 + '%',
+
+            height: HEIGHT_IN_PERCENT_OF_PARENT + 'vh',
+            // 'margin-top': (100 - HEIGHT_IN_PERCENT_OF_PARENT) / 2 + 'vh'
+        });
+
+    var gd = gd3.node();
+    var data, layout;
+
+
+    var searchResult = [];
+    var foundRa, foundDec, foundSimbad, foundProj;
+    var projectSearchResult = [];
+    var DEGREES = false;
+
+    var myPlot = document.getElementById('plotdiv');
+    var sourcesData = <%- JSON.stringify(sources) %>;
+    var sourcesSize = <%- JSON.stringify(sourcesSize) %>;
+    var poiCoord = <%- JSON.stringify(pois) %>;
+    var galaxyCoord = <%- JSON.stringify(galaxy) %>;
+
+    var sourcesNum = sourcesData["Project code"].length;
+
+
+    var almaNameList = <%- JSON.stringify(almaNameList) %>;
+    var modalSearchObject;
+    var projectCodeList = <%- JSON.stringify(projectCodeList) %>;
+
+    addObjects();
+    addProjectCode();
+
+    /*********************************************************************/
+
+    //  var conditions = ["z > 0", "0 < z && z < 0.5", "0.5 < z && z < 0.7", "0.7 < z && z < 1", "1 < z && z < 2", "2 < z && z < 3", "3 < z && z < 4", "z > 4"];
+    /*  var conditions = {
+     label: ["All",   3,        4,        6,        7,        8,         9,        10],
+     eval:  ["z > 0", "z == 3", "z == 4", "z == 6", "z == 7", "z == 8",  "z == 9", "z == 10"]
+     };
+     */
+    var conditions = {
+        "All": "z > 0",
+        3:     "z === 3",
+        4: "z === 4",
+        6: "z === 6",
+        7:  "z === 7",
+        8:  "z === 8",
+        9: "z === 9",
+        10: "z === 10"
+    };
+
+    var noema = {
+        x: [0,  24,  24, 24],
+        y: [90, 90, -30, -30],
+        fill: 'tonextx',
+        fillcolor: 'rgba(0, 255, 0, 0.3)',
+        type: 'scatter',
+        mode: 'none',
+        name: 'NOEMA',
+        hoverinfo: 'none'
+    };
+
+    var pois = {
+        x: poiCoord['x'],
+        y: poiCoord['y'],
+        mode: 'text',
+        name: 'PoIs',
+        text: poiCoord['name'],
+        textposition: 'top right',
+        textfont: {
+            size: 16,
+            color: 'red'
+        },
+        type: 'scatter',
+        hoverinfo: 'none'
+    };
+
+    var galaxyPlane = {
+        x: galaxyCoord['x'],
+        y: galaxyCoord['y'],
+        marker: {
+            color: 'red',
+            width: 1
+        },
+        mode: 'lines',
+        type: 'scatter',
+        name: 'Galactic Plane',
+        hoverinfo: 'none'
+    };
+
+
+
+    var chosenSourcesData = {};
+    var chosenSourcesSize = [];
+    var chosenSourcesNum = 0;
+    var ras = [];
+    var decs = [];
+
+    for (var prop in sourcesData) {
+        chosenSourcesData[prop] = [];
+    }
+
+    if (!chosenSourcesData.hasOwnProperty("FoV")) {
+        chosenSourcesData["FoV"] = [];
+    }
+
+    function getsourcesData(chosenCondition) {
+        // Remove prevoiusly added sources
+        for (var prop in sourcesData) {
+            chosenSourcesData[prop] = [];
+        }
+
+        chosenSourcesSize = [];
+        ras = [];
+        decs = [];
+
+
+
+
+        // Add sources meeting a condition
+        for (var i = 0 ; i < sourcesNum ; ++i) {
+            for(var j = 0; j < sourcesData["Band"][i].length; ++j) {
+                var z = sourcesData["Band"][i][j];
+                if (eval(conditions[chosenCondition])) {
+                    for (var prop in sourcesData) {
+                        chosenSourcesData[prop].push(sourcesData[prop][i]);
+                    }
+                    ras.push(sourcesData["RA"][i][0] / 15);
+                    decs.push(sourcesData["Dec"][i][0]);
+                    chosenSourcesSize.push(sourcesSize[i]);
+                    break;
+                }
+            }
+        }
+
+
+
+        chosenSourcesNum = chosenSourcesSize.length;
+
+        chosenSourcesData["HoverInfo"] = [];
+        for(var i=0;i<chosenSourcesNum;i++){
+            chosenSourcesData["HoverInfo"].push(sourcesData["Source name"][i] + ' --- ' + sourcesData["Project code"][i]);
+        }
+    }
+
+    // Default Country Data
+    setBubblePlot("All");
+
+    function setBubblePlot(chosenCondition) {
+
+        getsourcesData(chosenCondition);
+
+        var colors = Array.apply(null, Array(chosenSourcesNum)).map(function () {
+            return 'rgba(0, 0, 255, 0.3)';
+        });
+
+        var sources = {
+            x:         ras,
+            y:         decs,
+            mode:      'markers',
+            type:      'scatter',
+            name:      'Source',
+            text:      chosenSourcesData["HoverInfo"],
+            hoverinfo: "x+y+text",
+            marker:    {
+                size:  chosenSourcesSize,
+                color: colors,
+                line:  {
+                    color: 'rgba(0, 0, 0, 0.5)'
+                }
+            }
+        };
+
+        data = [noema, sources, pois, galaxyPlane];
+
+        layout = {
+            xaxis:     {
+                range: [24, 0],
+                title: 'Right Ascention [hours]'
+            },
+            yaxis:     {
+                range: [-90, 90],
+                title: 'Declination [Deg]'
+            },
+            title:     'Distribution of ALMA sources (2010-2016)',
+            hovermode: 'closest'
+        };
+
+        Plotly.newPlot(gd, data, layout);
+
+        var projectsClicked = {};
+
+
+        for (var i = 0; i < chosenSourcesNum; ++i) {
+            var projectsNum =  chosenSourcesData["Project code"][i].length;
+            for (var j = 0; j < projectsNum; ++j) {
+                var projectName = chosenSourcesData["Project code"][i][j];
+                if (!projectsClicked.hasOwnProperty(projectName)) {
+                    projectsClicked[projectName] = 0;
+                }
+            }
+        }
+
+
+        gd.on('plotly_click',
+            function (data) {
+
+                console.log(searchClicked);
+
+                if(!searchClicked){
+                    return;
+                }
+                console.log("Clicked");
+
+                var point = data.points[0];
+                var textStr = "";
+
+                colors = Array.apply(null, Array(chosenSourcesNum)).map(function () {
+                    return 'rgba(0, 0, 255, 0.3)';
+                });
+
+
+                //console.log(searchResult,foundRa,foundDec,foundSimbad);
+                //$("#loadingId").attr('class','loading');
+                if($('#projectList').val() === ""){
+                    $.post("/sourceFoV/search",{"searchResult" : searchResult, "RA" : foundRa, "DEC" : foundDec, "Simbad" : foundSimbad}).done(function(data){
+                        console.log(data);
+                        if(searchClicked) {
+                            textStr += href = "<a href='/sourceFoV/" + data.urlId + "'>More...</a>";
+                            //textStr+=href="<a href='/sourceFoV?source=" + encodeURI(chosenSourcesData["Source name"][point.pointNumber].replace("+", ";709;")) + "'>More...</a>";
+
+                            for (var i = 0; i < searchResult.length; i++) {
+                                var ind = searchResult[i];
+                                colors[ind] = 'red';
+                                //chosenSourcesSize[ind] = 30;
+                            }
+
+                            var update = {
+                                'marker.color': [colors]
+                            };
+
+                            Plotly.restyle(gd, update, [1]);
+
+                            var newAnnotation = {
+                                    x: point.xaxis.d2l(point.x),
+                                    y: point.yaxis.d2l(point.y),
+                                    arrowhead: 6,
+                                    arrowsize: chosenSourcesSize[point.pointNumber] / 8,
+                                    ax: 0,
+                                    ay: -30 - chosenSourcesSize[point.pointNumber],
+                                    bgcolor: 'rgba(255, 255, 255, 0.9)',
+                                    //opacity:     0.7,
+                                    font: {size: 24},
+                                    bordercolor: 'black',
+                                    arrowcolor: 'red',
+                                    text: textStr,
+                                    align: "left"
+                                },
+                                divid = document.getElementById('plotdiv'),
+                                newIndex = (divid.layout.annotations || []).length;
+                            if (newIndex) {
+
+                                var foundCopy = false;
+                                //       divid.layout.annotations.forEach(function (ann, sameIndex) {
+                                if (divid.layout.annotations[0].text === newAnnotation.text) {
+
+                                    for (var i = 0; i < chosenSourcesData["Project code"][point.pointNumber].length; ++i) {
+                                        // -=2 because previous ++ executes on every click.
+                                        projectsClicked[chosenSourcesData["Project code"][point.pointNumber][i]] -= 2;
+                                        for (var j = 0; j < chosenSourcesNum; ++j) {
+                                            var ind = chosenSourcesData["Project code"][j].indexOf(chosenSourcesData["Project code"][point.pointNumber][i]);
+                                            if (ind > -1) {
+                                                if (projectsClicked[chosenSourcesData["Project code"][point.pointNumber][i]] < 1) {
+                                                    colors[j] = 'rgba(0, 0, 255, 0.3)';
+                                                }
+                                            }
+                                        }
+                                    }
+
+
+                                    var updateR = {
+                                        'marker.color': [colors]
+                                    };
+                                    Plotly.restyle(gd, updateR, [1]);
+                                    Plotly.relayout(gd, 'annotations[0]', 'remove');
+                                    // foundCopy = true;
+                                    return;
+                                }
+                                // });
+                                // Allow only one annotation to be active
+                                Plotly.relayout(gd, 'annotations[0]', 'remove');
+                                // if (foundCopy) return;
+                            }
+                            Plotly.relayout(gd, 'annotations[0]', newAnnotation);
+                        }
+
+                        searchClicked = false;
+                        $("#loadingId").attr('class','loading:before');
+
+                    });
+                }else{
+                    $.post("/sourceFoV/search/" + $('#projectList').val(),{"searchProjectResult" : projectSearchResult,"RA" : sourcesData["RA"][projectSearchResult[0]][0], "DEC" : sourcesData["Dec"][projectSearchResult[0]][0], "Simbad" : sourcesData["Source name"][projectSearchResult[0]]}).done(function(data){
+                        console.log(data.urlId);
+
+                        textStr += href = "<a href='/sourceFoV/" + data.urlId + "'>More...</a>";
+                        //textStr+=href="<a href='/sourceFoV?source=" + encodeURI(chosenSourcesData["Source name"][point.pointNumber].replace("+", ";709;")) + "'>More...</a>";
+
+                        for (var i = 0; i < projectSearchResult.length; i++) {
+                            var ind = projectSearchResult[i];
+                            colors[ind] = 'red';
+                            //chosenSourcesSize[ind] = 30;
+                        }
+
+                        var update = {
+                            'marker.color': [colors]
+                        };
+
+                        Plotly.restyle(gd, update, [1]);
+
+                        var newAnnotation = {
+                                x: point.xaxis.d2l(point.x),
+                                y: point.yaxis.d2l(point.y),
+                                arrowhead: 6,
+                                arrowsize: chosenSourcesSize[point.pointNumber] / 8,
+                                ax: 0,
+                                ay: -30 - chosenSourcesSize[point.pointNumber],
+                                bgcolor: 'rgba(255, 255, 255, 0.9)',
+                                //opacity:     0.7,
+                                font: {size: 24},
+                                bordercolor: 'black',
+                                arrowcolor: 'red',
+                                text: textStr,
+                                align: "left"
+                            },
+                            divid = document.getElementById('plotdiv'),
+                            newIndex = (divid.layout.annotations || []).length;
+                        if (newIndex) {
+
+                            var foundCopy = false;
+                            //       divid.layout.annotations.forEach(function (ann, sameIndex) {
+                            if (divid.layout.annotations[0].text === newAnnotation.text) {
+
+                                for (var i = 0; i < chosenSourcesData["Project code"][point.pointNumber].length; ++i) {
+                                    // -=2 because previous ++ executes on every click.
+                                    projectsClicked[chosenSourcesData["Project code"][point.pointNumber][i]] -= 2;
+                                    for (var j = 0; j < chosenSourcesNum; ++j) {
+                                        var ind = chosenSourcesData["Project code"][j].indexOf(chosenSourcesData["Project code"][point.pointNumber][i]);
+                                        if (ind > -1) {
+                                            if (projectsClicked[chosenSourcesData["Project code"][point.pointNumber][i]] < 1) {
+                                                colors[j] = 'rgba(0, 0, 255, 0.3)';
+                                            }
+                                        }
+                                    }
+                                }
+
+
+                                var updateR = {
+                                    'marker.color': [colors]
+                                };
+                                Plotly.restyle(gd, updateR, [1]);
+                                Plotly.relayout(gd, 'annotations[0]', 'remove');
+                                // foundCopy = true;
+                                return;
+                            }
+                            // });
+                            // Allow only one annotation to be active
+                            Plotly.relayout(gd, 'annotations[0]', 'remove');
+                            // if (foundCopy) return;
+                        }
+                        Plotly.relayout(gd, 'annotations[0]', newAnnotation);
+
+
+                        searchClicked = false;
+                        $("#loadingId").attr('class','loading:before');
+                    });
+
+
+                }
+
+
+
+
+              /* Set to red colors all objects within the same project
+               for (var i= 0; i < chosenSourcesData["Project code"][point.pointNumber].length; ++i) {
+
+               ++projectsClicked[chosenSourcesData["Project code"][point.pointNumber][i]];
+
+               for (var j = 0; j < chosenSourcesNum; ++j) {
+               var ind = chosenSourcesData["Project code"][j].indexOf(chosenSourcesData["Project code"][point.pointNumber][i]);
+               if (ind > -1) {
+               colors[j] = 'red';
+               chosenSourcesSize[j] = 30;
+               }
+               }
+               }*/
+
+
+
+
+
+
+                // delete instead if clicked twice
+
+
+
+            })
+      /*
+       .on('plotly_clickannotation', function (event, data) {
+       Plotly.relayout(gd, 'annotations[0]', 'remove');
+       });
+       */
+    }
+
+    // var innerContainer = document.querySelector('data-num="0"'),
+    var innerContainer = document.querySelector('.bubbleplot'),
+        plotEl = innerContainer.querySelector('.plot');
+
+
+
+
+
+
+    /*********************************************************************/
+
+
+    /* Check if the provided argument is numeric. */
+    function isNumeric(n) {
+        return !isNaN(parseFloat(n)) && isFinite(n);
+    }
+
+    /* Check if two float numbers are equal with error *err* */
+    function flEqual(a, b, err) {
+        return Math.abs(a - b) <= err;
+    }
+
+    /*
+     Function to find two floating point values in two arrays at the same index.
+     *start* and *end* parameters are optional
+     */
+    function findRaDec(ra, dec, ras, decs, err, start, end) {
+
+        start = isNumeric(start) ? start : 0;
+        end = isNumeric(end) ? end : ras.length;
+        //err = isNumeric(err) ? 1 / err : 1e-02;
+
+        //console.log(err);
+        //const ERR = 1e-02;
+
+        var res = [];
+
+        for (var i = start; i < end; ++i) {
+            if (flEqual(ra, ras[i], err) && flEqual(dec, decs[i], err))
+                res.push(i);
+        }
+        return res;
+    }
+
+    /*********************************************************************/
+
+
+    /*
+     * Get *theURL*'s content as XML and process it with *callback* function
+     */
+    function httpGetAsync(theUrl, callback) {
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.onreadystatechange = function() {
+            if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
+                callback(xmlHttp.responseText);
+        }
+        xmlHttp.open("GET", theUrl, true); // true for asynchronous
+        xmlHttp.send(null);
+    }
+
+    /*
+     * Convert DD:MM:SS to degrees
+     */
+    function dmsToDegree(s) {
+        var dms = s.split(":");
+
+        for (var i = 0; i< dms.length; ++i) {
+            dms[i] = parseInt(dms[i]);
+        }
+
+        if(dms[0] < 0)
+            return dms[0] - dms[1] / 60 - dms[2] / 3600;
+        return dms[0] + dms[1] / 60 + dms[2] / 3600;
+    }
+
+
+    /*
+     * Convert HH:MM:SS to degrees
+     */
+    function hmsToDegree(s) {
+        var hms = s.split(":");
+
+        for (var i = 0; i< hms.length; ++i) {
+            hms[i] = parseInt(hms[i]);
+        }
+
+        if(hms[0] < 0)
+            return hms[0] * 15 - hms[1] / 4 - hms[2] / 240;
+        return hms[0] * 15 + hms[1] / 4 + hms[2] / 240;
+    }
+
+    /*
+     * Check if search is in degrees or hms
+     */
+    function checkBoxClick() {
+        if (document.getElementById('degrees').checked) {
+            document.getElementById('ra').placeholder = "RA (hours)";
+            document.getElementById('dec').placeholder = "DEC (degrees)";
+            document.getElementById('ra').pattern="-{0,1}[0-9]{1,}.{0,1}[0-9]{0,}";
+            document.getElementById('dec').pattern="-{0,1}[0-9]{1,}.{0,1}[0-9]{0,}";
+            DEGREES = true;
+        }
+        else {
+            document.getElementById('ra').placeholder = "RA HH:MM:SS";
+            document.getElementById('dec').placeholder = "DEC HH:MM:SS";
+            document.getElementById('ra').pattern="[0-9]{2}:{1}[0-9]{2}:{1}[0-9]{2}";
+            document.getElementById('dec').pattern="[0-9]{2}:{1}[0-9]{2}:{1}[0-9]{2}";
+            DEGREES = false;
+        }
+    }
+
+    /*********************************************************************/
+
+
+    function findByPosition(ra, dec, err) {
+
+        var ind = [];
+        var result = [];
+
+
+        for (var i = 0; i < chosenSourcesData["RA"].length; ++i) {
+            ind = findRaDec(ra, dec, chosenSourcesData["RA"][i], chosenSourcesData["Dec"][i], err );
+            //if (ind > -1) {
+            //Plotly.Fx.hover(myPlot, [{ curveNumber: 1, pointNumber: i }]);
+            //gd.emit('plotly_click', { points: gd._hoverdata });
+            //break; // TODO: Check if OK to show only one result
+            //}
+            if(ind.length > 0){
+                result.push(i);
+            }
+
+
+        }
+
+        console.log("Result length:",result.length);
+
+        searchResult = result;
+
+        if(result.length == 0){
+            alert("Object not found.");
+            searchClicked = false;
+            $("#loadingId").attr('class','loading:before');
+        }else{
+            $('#searchModalId').modal('hide');
+            console.log(searchClicked,result.length);
+            //console.log(result.length)
+            for(var i=0;i<result.length;i++){
+                Plotly.Fx.hover(myPlot, [{ curveNumber: 1, pointNumber: result[i] }]);
+            }
+
+            gd.emit('plotly_click', { points: gd._hoverdata })
+        }
+      /*
+       if (i < chosenSourcesData["RA"].length && ind < 0) {
+       alert("Object not found.");
+       }else{
+       Plotly.Fx.hover(myPlot, [{ curveNumber: 1, pointNumber: i }]);
+       gd.emit('plotly_click', { points: gd._hoverdata });
+       }*/
+    }
+
+
+    function buttonClick() {
+
+        searchClicked = true;
+
+        var name = document.getElementById('name').value;
+
+        var almaName = $('#headersList').val();
+
+        var hms = document.getElementById('hms').value;
+        var dms = document.getElementById('dms').value;
+
+        var projectCode = $('#projectList').val();
+
+
+
+        var ind = -1;
+        var arcmin = document.getElementById('arcmin').value;
+
+        if(isNaN(arcmin)){
+            alert("Please, enter a number.");
+            searchClicked = false;
+            return;
+        }else{
+            if(arcmin > 1000){
+                alert("The entered number is too big.");
+                searchClicked = false;
+                return;
+            }
+        }
+        if(arcmin === ''){
+            err = 10/60;
+        }else{
+            err = arcmin / 60;
+        }
+
+
+        if(hms === "" && dms !== ""){
+            alert("Please only HMS.");
+            searchClicked = false;
+            return;
+        }
+
+        if(hms !== "" && dms === ""){
+            alert("Please only DMS.");
+            searchClicked = false;
+            return;
+        }
+
+
+
+        if(hms !== "" && dms !== ""){
+            if(name !== "" || almaName !== "" || projectCode !== ""){
+                alert("Please only alma-name, sesame-name, project code or HMS/DMS.");
+                searchClicked = false;
+                return;
+            }
+
+
+            /* validation of hms/dms format HH:MM:SS DD:MM:SS */
+            if(hms.split(':').length != 3 || dms.split(':').length != 3){
+                alert("Invalid format of HMS/DMS.");
+                searchClicked = false;
+                return;
+            }
+
+            for(var i=0;i<3;i++){
+                if(!isNumeric(hms.split(':')[i]) || !isNumeric(dms.split(':')[i]) ){
+                    alert("Invalid format of HMS/DMS.");
+                    searchClicked = false;
+                    return;
+                }
+                if(i != 0){
+                    if(parseInt(hms.split(':')[i]) < 0 || parseInt(dms.split(':')[i]) < 0 ){
+                        alert("Invalid format of HMS/DMS.");
+                        searchClicked = false;
+                        return;
+                    }
+                }
+            }
+
+
+            $("#loadingId").attr('class','loading');
+
+
+            var ra_hh = parseInt(hms.split(':')[0]);
+            var ra_mm = parseInt(hms.split(':')[1]);
+            var ra_ss = parseFloat(hms.split(':')[2]);
+
+            var ra = ra_hh*15 + ra_mm/4 + ra_ss/240;
+
+
+
+            var dec_dd = parseInt(dms.split(':')[0]);
+            var dec_mm = parseInt(dms.split(':')[1]);
+            var dec_ss = parseFloat(dms.split(':')[2]);
+
+
+
+            var dec = Math.abs(dec_dd) + dec_mm/60 + dec_ss/3600;
+            if(dms[0] === '-'){
+                dec = -dec;
+            }
+
+            //console.log(ra_hh,ra_mm,ra_ss);
+            //console.log("RA : ",ra);
+            //console.log("DEC : ", dec);
+            //console.log("ARCMIN : ",err);
+
+            foundRa = ra;
+            foundDec = dec;
+            foundSimbad = "TEST_SIMBADNAME";
+
+            findByPosition(ra, dec, err);
+
+            return;
+        }
+
+
+
+        if (name === "" && almaName === "" && projectCode === ""){
+            alert("Please, enter sesame-name,alma-name,hms-dms or project code.");
+            searchClicked = false;
+            return false;
+        }
+
+        if (name !== "" && almaName !== ""){
+            alert("Please, enter only alma-name or sesame-name.");
+            searchClicked = false;
+            return false;
+        }
+        if(projectCode !== "" && (name !== "" || almaName !== "") ){
+            alert("Please, enter only alma-name/sesame-name or project code.");
+            searchClicked = false;
+            return false;
+        }
+
+
+        $('#searchModalId').modal('hide');
+        $("#loadingId").attr('class','loading');
+
+
+        if(projectCode !== ""){
+
+            foundProj = projectCode.toUpperCase();
+
+            searchProjectCode(foundProj);
+        }else{
+            if (name !== "") {
+
+                foundSimbad = name;
+
+                var names = [name.replace(/\s+/g, '').toUpperCase()];
+                // Using Sesame Name Resolver to find all names and aliases of the object.
+                httpGetAsync( 'http://cdsweb.u-strasbg.fr/cgi-bin/nph-sesame/-oxpI/~A?' + name, function(xml) {
+                    var xmlDoc;
+                    if (window.DOMParser) {
+                        parser = new DOMParser();
+                        xmlDoc = parser.parseFromString(xml, "text/xml");
+                    }
+                    else {
+                        // Internet Explorer
+                        xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
+                        xmlDoc.async = false;
+                        xmlDoc.loadXML(xml);
+                    }
+
+                    var ra = xmlDoc.getElementsByTagName("jradeg");
+                    var dec = xmlDoc.getElementsByTagName("jdedeg");
+
+                    console.log(ra,dec)
+
+
+                    if (ra.length === 0 || dec.length === 0) {
+                        alert("Object not found.");
+                        searchClicked = false;
+                        $("#loadingId").attr('class','loading:before');
+                    }
+                    else {
+                        ra = ra[0].innerHTML;
+                        dec = dec[0].innerHTML;
+
+                        foundRa = ra;
+                        foundDec = dec;
+                        console.log(foundRa,foundDec);
+
+                        findByPosition(foundRa, foundDec, err);
+
+                    }
+                });
+            }else{
+
+                foundSimbad = almaName;
+                searchAlmaName(almaName);
+
+            }
+        }
+
+
+
+
+        return false;
+    }
+
+    function searchAlmaName(almaName){
+        var i=0;
+        for(;i<sourcesNum;i++){
+            if(sourcesData["Source name"][i].toUpperCase() === almaName.toUpperCase()){
+                foundRa = sourcesData["RA"][i].toString();
+                foundDec = sourcesData["Dec"][i].toString();
+                console.log(foundRa,foundDec);
+
+                findByPosition(foundRa, foundDec, err);
+                break;
+            }
+        }
+
+        if(i == sourcesNum){
+            alert("Object not found.");
+            searchClicked = false;
+            $("#loadingId").attr('class','loading:before');
+        }
+
+    }
+
+
+    function searchProjectCode(projectCode){
+
+        var result = [];
+
+        for(var i=0;i<sourcesNum;i++) {
+            if(sourcesData["Project code"][i][0].toUpperCase() === projectCode) {
+                result.push(i);
+            }
+        }
+
+        projectSearchResult = result;
+
+        if(projectSearchResult.length == 0){
+            alert("Object not found.");
+            searchClicked = false;
+            $("#loadingId").attr('class','loading:before');
+        }else{
+            //console.log(result.length)
+            for(var i=0;i<projectSearchResult.length;i++){
+                Plotly.Fx.hover(myPlot, [{ curveNumber: 1, pointNumber: projectSearchResult[i] }]);
+            }
+
+            gd.emit('plotly_click', { points: gd._hoverdata })
+        }
+
+
+    }
+
+
+
+    function addProjectCode() {
+
+        $("#projectList").select2({
+            data: projectCodeList
+        });
+
+        $("#projectList").select2({
+            placeholder: "project code",
+            allowClear: true
+        });
+    }
+
+    function matchStart (term, text) {
+        if (text.toUpperCase().indexOf(term.toUpperCase()) == 0) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+
+
+    /* function to add Header.OBJECT (source names) too search field */
+    function addObjects() {
+
+        $('#headersList').select2({
+            data: almaNameList
+        });
+
+
+
+        $.fn.select2.amd.require(['select2/compat/matcher'], function (oldMatcher) {
+            $('#headersList').select2({
+                matcher: oldMatcher(matchStart),
+                placeholder: "alma-name",
+                allowClear: true,
+                minimumInputLength: 1
+            })
+        });
+
+
+    }
+
+
+    /*********************************************************************/
+
+    /****************** Set warning for RA DEC format *********************/
+    function invalid(event) {
+        if (DEGREES) {
+            event.target.setCustomValidity('Please, enter a number.');
+        }
+        else {
+            event.target.setCustomValidity('Please, use the HH:MM:SS format.');
+        }
+    }
+
+    //document.getElementById('ra').oninvalid = invalid;
+    //document.getElementById('dec').oninvalid = invalid;
+
+    /*********************************************************************/
+
+
+    $("#searchButtonId").click(function(){
+        buttonClick();
+    });
+
+    /*
+    $("#searchModalId").on("hidden.bs.modal", function () {
+        for(var i=0;i<1000;i++)
+        console.log("close event binding!");
+    });
+    */
+
+
+
+</script>
+</body>
+
+</html>

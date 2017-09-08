@@ -1,0 +1,2127 @@
+<!DOCTYPE html>
+<html>
+
+<title> <%= title %> </title>
+
+<head>
+  <!-- Plotly.js -->
+  <script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_SVG">
+  </script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+  <script src="/javascripts/bootstrap.min.js"></script>
+
+  <!-- Adding Google Analytics to monitor site views. -->
+  <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-65904265-3', 'auto');
+  ga('send', 'pageview');
+
+  </script>
+
+
+
+  <link rel="stylesheet" type="text/css" href="/stylesheets/bootstrap.min.css">
+
+  <link rel="STYLESHEET" type="text/css" href="/stylesheets/loader.css" >
+  <link rel="STYLESHEET" type="text/css" href="/stylesheets/list.css">
+  <link rel="STYLESHEET" type="text/css" href="/stylesheets/overlay.css">
+
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.1/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.1/js/select2.min.js"></script>
+
+  <style>	
+	th, td {
+    		padding: 0px;
+                margin: 0px
+	}
+  </style>
+
+</head>
+
+<body>
+  
+  <header>
+    <% include ./partials/header %>
+  </header>
+  <div class="loading:before" id="loadingId"></div>
+  
+  <input type="hidden" name="file" id="file" value="ALMA00000006.fits">
+  <!--
+      <div id="loading">
+	<img id="loading-image" src="/images/earth_animated.gif" alt="Loading..." />
+      </div>
+      -->
+  <div id="headerLayer" class="overlay" style="overflow:scroll">
+    <a href="javascript:void(0)" class="closebtn" onclick="hideHeader()">&times;</a>
+    <div class="overlay-content">
+      <div id="headerParent">
+	<div id="header" class="scrollWrapper">
+	  <table></table>
+	</div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="myNav" class="overlay">
+    <!-- <a href="#" id="openFile" type="hidden">Open file</a> -->
+    <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+    <div class="overlay-content">
+      <table style="width: 100%;">
+	<tr>
+	  <td>
+	    <div id="filesListParent">
+	      <div id="filesList" class="scrollWrapper">
+		<ul></ul>
+	      </div>
+	    </div>
+	  </td>
+	  <td>
+	    <div id="headerTableParent">
+	      <div id="headerTable" class="scrollWrapper">
+		<table></table>
+	      </div>
+	    </div>
+	  </td>
+	</tr>
+	<tr>
+	  <input type="checkbox" name="showAll" id="showAll_id" value="{showAll}" onchange="checkBoxChanged(this)">
+	  Show all data. Initially shown are the data of which the flename ends with ".pbcor.fits", ".pbcorr.fits", ".image.fits", "line.fits", "cont.fits" or "clean.fits"
+	</tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="bubbleplots">
+    <table>
+      <tr>
+	<td align='center' colspan=2><div id="info" style="background-color:lightblue"></div></td>
+      </tr>
+      <tr>
+	<td valign="top">
+	  <!--div id="plotsParent" style="background-color:orange"-->
+	  <table class="bubbleplot">
+	    <tr>
+	      <td>
+		<div class="plot"  id="plotSlice"></div>
+	      </td>
+	      <td>
+		<div class="plot"  id="plotSpectrum"></div>
+	      </td>
+	    </tr>
+	    <tr>
+	      <td>
+		<div class="plot"  id="plotAverage"></div>
+	      </td>
+	      <td>
+		<div class="plot"  id="plotFreqAverage"></div>
+	      </td>
+	    </tr>
+	  </table>
+	  <!--/div-->
+	</td>
+	<td align="left">
+	  <div id="objectsListParent">
+	    <!--div id="objectsList" class="scrollWrapper">
+		<input type="text" id="filterObjects" onkeyup="filterObjects()" placeholder="Object">
+		<ul id="objects"></ul>
+	    </div-->
+	  </div>
+	</td>
+      </tr>
+    </table>
+  </div>
+</body>
+
+<script>
+<!-- JAVASCRIPT CODE GOES HERE -->
+
+function filterObjects() {
+  // Declare variables
+  var input, filter, ul, li, a, i;
+  input = document.getElementById('filterObjects');
+  filter = input.value.toUpperCase();
+  ul = document.getElementById("objects");
+  li = ul.getElementsByTagName('li');
+
+  // Loop through all list items, and hide those who don't match the search query
+  for (i = 0; i < li.length; i++) {
+    a = li[i].getElementsByTagName("a")[0];
+    if (a.innerHTML.toUpperCase().indexOf(filter) > -1) {
+      li[i].style.display = "";
+    } else {
+      li[i].style.display = "none";
+    }
+  }
+}
+
+
+function squareZoom(x0, x1, y0, y1) {
+    let newRange = Math.max(x1-x0, y1-y0);
+    
+    let centerX =  (x0 + x1) / 2.0;
+    let centerY =  (y0 + y1) / 2.0;
+
+    let X0 = centerX - newRange / 2.0;
+    let X1 = centerX + newRange / 2.0;
+    let Y0 = centerY - newRange / 2.0;
+    let Y1 = centerY + newRange / 2.0;
+
+    return [[X0, X1], [Y0, Y1]];
+
+}
+
+
+/*
+** Coordinate tabulators
+**
+**  - crval : value at reference point
+**  - cdelt : increment of abscissa
+**  - crpix : coordinate of reference point
+**  - n : tabulate at point of coordinate n
+*/
+var linearTabulator = function(crval, cdelt, crpix, n) {
+  return crval + (n - crpix) * cdelt;
+}
+
+let speedOfLight = 299792458.0;  // In m/s
+/* 
+
+** Frequency <-> Velocity derivations.
+**
+** From https://www.iram.fr/IRAMFR/ARN/may95/node4.html
+*/ 
+
+/*
+** No verification is done on the values of restfreq and frequency. Both are expected to have realistic values.
+** frequency and restfreq are expected to by in the same unit (i.e. both in HZ or both in GHZ)
+** The result is in m/s.
+*/
+var f2v = function(frequency, restfreq) {
+    return speedOfLight * (restfreq - frequency) / restfreq;
+}
+
+
+/*
+** No verification is done on the values of restfreq and velocity. Both are expected to have realistic values.
+*/
+var v2f = function(velocity, restfreq) {
+    return restfreq * ( 1.0 - velocity / speedOfLight );
+}
+
+/*
+** Frequency to wavelength
+*/
+var f2lambda = function(frequency) {
+    return speedOfLight / frequency;
+}
+
+let unitFactor = {"M/S": 1.0, "KM/S": 1000., "HZ": 1.0, "MHZ": 1000000., "GHZ" : 1.e+9};
+let defaultOutputUnit = {"FREQ" : "GHZ", "VRAD" : "KM/S", "VOPT" : "KM/S", "STOKES" : "_"};
+
+
+
+var allFilesInOverlayNav;
+var showAllChecked = false;
+var extentionList = [".pbcor.fits", ".pbcorr.fits", ".image.fits", "line.fits", "cont.fits", "clean.fits"];
+
+var plotsLoaded = 0;
+var fitsFile =  decodeURIComponent(<%- JSON.stringify(fitsFile) %>);
+
+var d3 = Plotly.d3;
+
+//var WIDTH_IN_PERCENT_OF_PARENT = 100 / 2 - 0.5, HEIGHT_IN_PERCENT_OF_PARENT = 100 / 2 - 1.5;
+var WIDTH_IN_PERCENT_OF_PARENT = 45, HEIGHT_IN_PERCENT_OF_PARENT = 45;
+var WIDTH = document.documentElement.clientWidth;
+var HEIGHT = document.documentElement.clientHeight;
+var minWH = WIDTH < HEIGHT ? WIDTH : HEIGHT;
+var maxWH = WIDTH > HEIGHT ? WIDTH : HEIGHT;
+var listWidth = 0;
+var scrlBar = 15;//document.documentElement.offsetWidth - document.documentElement.clientWidth;
+
+var gd3Slice = d3.select('#plotSlice')
+.style({
+  width: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+  height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+  display: 'inline-block'
+});
+
+var gd3Average = d3.select('#plotAverage')
+.style({
+  width:  HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',  //WIDTH_IN_PERCENT_OF_PARENT + '%',
+  height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+  display: 'inline-block'
+});
+
+var gd3Spectrum = d3.select('#plotSpectrum')
+.style({
+  width: WIDTH - minWH / 2 - listWidth + 'px', // 100 - HEIGHT_IN_PERCENT_OF_PARENT + 'vw',
+  height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+  display: 'inline-block'
+});
+
+var gd3FreqAverage = d3.select('#plotFreqAverage')
+.style({
+  width: WIDTH - minWH / 2 - listWidth + 'px', //100 - HEIGHT_IN_PERCENT_OF_PARENT + 'vw',
+  height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+  display: 'inline-block'
+});
+
+var gd3Objects = d3.select('#objectsListParent')
+.style({
+  width: listWidth  + 2*scrlBar + 'px',//100 - 2 * HEIGHT_IN_PERCENT_OF_PARENT + 'vw',
+  height: HEIGHT + 'px',
+  overflow: 'hidden',
+  //  'padding-right': scrlBar + 'px'
+});
+var gd3Files = d3.select('#filesListParent')
+.style({
+  width: document.documentElement.clientWidth / 3 + 2*scrlBar + 'px',
+  height: document.documentElement.clientHeight - 50 + 'px',
+  overflow: 'hidden',
+  position: 'absolute',
+  //  'padding-right': scrlBar + 'px'
+});
+var gd3Header = d3.select('#headerTableParent')
+.style({
+  width: document.documentElement.clientWidth / 3 * 2 + 'px',
+  height: document.documentElement.clientHeight - 50 + 'px',
+  overflow: 'hidden',
+  position: 'absolute',
+  //  'padding-right': scrlBar + 'px'
+});
+
+var historyKeywords_ = ["DATE", "ORIGIN", "BLOCKED"];
+var describingObservationKeywords_ = ["DATE-OBS","TELESCOP", "INSTRUME", "OBSERVER", "EQUINOX","EPOCH"];
+var mandatoryKeywords_ = ["SIMPLE", "BITPIX", "NAXIS", "NAXIS1", "NAXIS2", "NAXIS3", "NAXIS4"];
+var beamSizeKeywords_ = ["BMIN", "BMAJ", "BPA"];
+var restFrqKeywords_ = ["RESTFRQ"];
+var arrayKeywords_ = ["BSCALE", "BZERO", "BUNIT", "BLANK", "CTYPE1", "CTYPE2", "CTYPE3", "CTYPE4", "CRPIX1", "CRPIX2", "CRPIX3", "CRPIX4", "CRVAL1", "CRVAL2", "CRVAL3", "CRVAL4", "CDELT1", "CDELT2", "CDELT3", "CDELT4", "CROTA1", "CROTA2", "CROTA3", "CROTA3", "CUNIT1", "CUNIT2", "CUNIT3", "CUNIT4", "DATAMIN", "DATAMAX"];
+var obsGeoKeywords_ = ["OBSGEO-X", "OBSGEO-Y", "OBSGEO-Z", "OBSRA", "OBSDEC"];
+
+function keywordsByRegex(header, re) {
+  var kw, result = [];
+  for (kw in header) {
+    if (kw.match(re) && header.hasOwnProperty(kw)) {
+      result[result.length] = kw;
+    }
+  }
+  return result.sort();
+}
+
+function extractKeywords(keywords, header) {
+  var result=[];
+  for (var mk in keywords) {
+    if (keywords[mk] in header) {
+      result[keywords[mk]] = header[keywords[mk]];
+      delete header[keywords[mk]];
+    }
+  }
+  return result.sort();
+}
+
+function addTable(path) {
+
+  $('.active').removeClass('active');
+
+  var file = path.split('/')
+  $('#filesList ul li a').filter(function(){
+    return $(this).text() == file[file.length - 1];
+  }).addClass('active');
+
+  $.post("",{"method":"getFitsHeader", "path": path}).done(function(resp) {
+    var header = resp.data;
+    var headerTable = $('#headerTable > table');
+    headerTable.empty();
+
+    headerTable.append('<tr><td><a href=sourceFD?file=' + encodeURIComponent(path) + '&object=' + header["Header"]["OBJECT"] + '  id="openFile">Open file</a></td><td></td></tr>');
+
+    var gb = header["Size"] / (1024 * 1024 * 1024);
+    var size = gb < 1 ? round(gb * 1024, 2)  + " MB" : round(gb, 2) + " GB";
+
+    headerTable.append('<tr><td><span>OBJECT: ' + header["Header"]["OBJECT"] + '</span></td><td><span>Size: ' + size + '</span></td></tr>');
+    delete header["Header"]["OBJECT"];
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+    /* History keywords */
+    var mks = extractKeywords(historyKeywords_, header["Header"]);
+    for (var mk in mks) {
+      headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+    }
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+    /* describing observation keywords */
+    var mks = extractKeywords(describingObservationKeywords_, header["Header"]);
+    for (var mk in mks) {
+      headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+    }
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+    /* The rest frequency */
+    var mks = extractKeywords(restFrqKeywords_, header["Header"]);
+    for (var mk in mks) {
+      headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+    }
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+    /* The mandatory keywords */
+    var mks = extractKeywords(mandatoryKeywords_, header["Header"]);
+    for (var mk in mks) {
+      headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+    }
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+    /* The beam size keywords */
+    var mks = extractKeywords(beamSizeKeywords_, header["Header"]);
+    for (var mk in mks) {
+      headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+    }
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+    /* The array keywords */
+    var mks = extractKeywords(arrayKeywords_, header["Header"]);
+    for (var mk in mks) {
+      headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+    }
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+    /* The geographic location of the observation (m) */
+    var mks = extractKeywords(obsGeoKeywords_, header["Header"]);
+    for (var mk in mks) {
+      headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+    }
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+    /* The PC keywords */
+    var PCKeywords_ = keywordsByRegex(header["Header"], /PC\d\d/);
+    var mks = extractKeywords(PCKeywords_, header["Header"]);
+    for (var mk in mks) {
+      headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+    }
+    headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+
+
+    /* The rest */
+    kws=[];
+    for (var kw in header["Header"]) {
+      kws[kws.length] = kw;
+    }
+
+    /* is listed by alphabetical order */
+    kws = kws.sort();
+    for (i = 0; i < kws.length; i++)  {
+      headerTable.append('<tr><td><span>' + kws[i] + '</span></td><td><span>' + header["Header"][kws[i]] + '</span></td></tr>');
+    }
+  });
+}
+
+
+/* Open when someone clicks on the span element */
+function openNav(object) {
+
+  document.getElementById("myNav").style.height = "100%";
+
+  $.post("",{"method":"getFiles", "object": object}).done(function(resp) {
+    var files = allFilesInOverlayNav = resp.data;
+    console.log(files);
+
+    if(showAllChecked)
+    showAllExt(allFilesInOverlayNav)
+    else
+    notShowAllExt(allFilesInOverlayNav)
+
+
+  });
+}
+
+function showHeader() {
+    document.getElementById("headerLayer").style.height= "100%";
+}
+
+function hideHeader() {
+    document.getElementById("headerLayer").style.height= "0%";
+}
+
+/* Close when someone clicks on the "x" symbol inside the overlay */
+function closeNav() {
+  // clear the existing list
+  $('#filesList ul li').remove();
+
+  // clear the existing table
+  $('#headerTable > table').empty();
+
+  document.getElementById("myNav").style.height = "0%";
+  document.getElementsByClassName('nav navbar-nav')[0].getElementsByTagName('li')[0].className = 'active';
+}
+
+/*
+function addObjects() {
+    $.post("",{"method":"getObjects"}).done(function(resp) {
+        var objects = resp.data;
+        for (var c = 0; c < objects.length; ++c) {
+            console.log(objects[c]);
+            //$("#objectsList ul").append('<li><a href="/sourceFD?file=ALMA01004954.fits">' + (objects[c].length > 10 ? objects[c].slice(0, 10)+"..." : objects[c])  + '</a></li>');
+            $("#objectsList ul").append('<li><a href="#" onclick="openNav(\'' + objects[c] + '\'); return false;">' + (objects[c].length > 10 ? objects[c].slice(0, 10)+"..." : objects[c])  + '</li>');
+        }
+    });
+}*/
+
+function addObjects() {
+    $.post("",{"method":"getObjects"}).done(function(resp) {
+
+        headers = resp.data;
+        headers.shift();
+
+
+
+        $("#headersList").select2({
+            data: headers
+        });
+    });
+}
+
+
+function addHistory() {
+    $.post("",{"method":"getHistory"}).done(function(resp) {
+	
+	visitedFiles = resp.data;
+	var newLen = visitedFiles.unshift("Recent files");
+	$("#history").select2({
+	    data : visitedFiles
+	});
+    });
+}
+
+function openModalButtonClicked(){
+
+    var object = document.getElementById('select2-headersList-container').innerHTML;
+
+    openNav(object);
+
+
+}
+
+
+function visitedFileButtonClicked(){
+
+    var object = document.getElementById('select2-history-container').innerHTML;
+
+    console.log("visitedFileButtonClicked : " + object);
+    if (object != "Recent files") {
+	let x = object.indexOf("::");
+	if ( x > -1 ) {
+	    let filename = object.substring(x+2);
+	    document.location.href="sourceFD?file="+filename;
+	}
+    }
+}
+
+var headerData;
+
+var gdSlice = gd3Slice.node(); // Where the slice image is
+var gdAverage = gd3Average.node(); // where
+var gdSpectrum = gd3Spectrum.node();
+var gdFreqAverage = gd3FreqAverage.node();
+var data = [];
+var layout;
+
+/*
+window.onresize = function() {
+//console.log("window resize")
+setBarPlot();
+//resizeWindow();
+};*/
+
+var dataAverage = [];
+var dataSlice = [];
+var dataFreq = [];
+var dataFreqAverage = [];
+
+var heatmapPlot = {
+  type: 'heatmap',
+  connectgaps: 'true',
+  colorscale: [
+    ['0.0', 'black'],
+    ['0.125', 'blue'],      
+    ['0.250', 'cyan'],
+    ['0.375', 'lightgreen'],
+    ['0.500', 'yellow'],
+    ['0.625', 'orange'],
+    ['0.750', 'red'],
+    ['0.875', '#FD3F92'],
+    ['1.0', 'white']
+  ],
+  colorbar: {
+    thickness: 10,
+    ypad: 0,
+    xpad: 0
+  },
+  hoverinfo: 'z',
+  zsmooth: 'best'
+};
+
+var heatmapLayout = {
+    xaxis: {
+	tickmode: "array",
+	tickangle: 15,
+	zeroline: false,
+	side: "right",
+	range: undefined
+    },
+    yaxis: {
+	tickmode: "array",
+	tickangle: 75,
+	zeroline: false,
+	range: undefined
+    },
+    margin: {
+	r: 80,
+	l: 60,
+	b: 70,
+	t: 40,
+	autoexpand: false
+    },
+
+    showscale : false,
+
+    colorbar : {
+	tickformat: ".6g",
+	tickprefix: "#",
+	showexponent: "all"     
+    },
+    
+    titlefont: {
+	size: 12
+    },
+
+    forceRelayout: false // Not present in Plotly library. Added to check if plot was relayouted manually.
+};
+
+var scatterPointPlot = {
+  type: "scatter",
+  mode: "markers",
+  hoverinfo: "none",
+  x: [0],
+  y: [0],
+  marker: {
+    opacity: 1,
+    size: 0.000001,
+    color: "black"
+  },
+  line: {
+    width: 0,
+    color: "black"
+  }
+};
+
+var frequencyPlot = {
+  type: 'scatter',
+  marker: {
+    color: "#1f77b4",
+    size : 5.
+  },
+  line: {
+    color: "#1f77b4",
+    width: 1
+  },
+  connectgaps: 'true',
+  hoverinfo: 'x+y'
+};
+
+var frequencyPlotBorder = {
+  type: 'scatter',
+  mode: "lines",
+  y: [],
+  line: {
+    color: "yellow",
+    width: 0.0001
+  },
+  marker : {
+    color: "blue"
+  },
+  hoverinfo: "x+y"
+};
+
+var frequencyAxis = {
+  xaxis: 'x2',
+  type: 'scatter',
+  marker: {
+    opacity: 1,
+    size: 0.000001,
+    color: 'black'
+  },
+  mode: 'markers',
+  hoverinfo: 'none'
+};
+
+var frequencySelectedRegionPlot = {
+  x: [0,  0,  0, 0],
+  y: [0,  0,  0, 0],
+  fill: 'tozerox',
+  fillcolor: 'rgba(150, 150, 0, 0.3)',
+  type: 'scatter',
+  mode: 'none',
+  hoverinfo: 'none'
+};
+
+var frequencyMarker = {
+  hoverinfo: 'x',
+  type:      'scatter',
+  mode:      'markers',
+  marker: {
+    color: 'rgb(255,0,0)',
+    size: 8,
+    line: {color: 'black'},
+    opacity: 0.7
+  }
+};
+
+
+var frequencyLayout = {
+    xaxis: {
+	title: 'Frequency (GHz)',
+	hoverformat: '.4f',
+	ticks: "",
+	showgrid: false,
+	zeroline: false
+    },
+    yaxis: {
+	title: 'Flux density(Jy/beam)',
+	hoverformat: '.4f',
+	mirror: "true",
+	ticks: "inside",
+	nticks: 6,
+	tickmode: 'auto',
+	showgrid: true,
+	zeroline: true
+    },
+    
+    xaxis2: {
+	zeroline: false,
+	showgrid: true,
+	ticks: 'outside',
+	side: 'bottom',
+	overlaying: 'x'
+    },
+
+    yaxis2: {
+	title: 'Brightness temperature (K)',
+	zeroline: false,
+	mirror: 'ticks',
+	showgrid: false,
+	ticks: "",
+	nticks: 6,
+	tickmode: "",
+	overlaying : 'y',
+	side : 'right'
+    },
+    margin: {
+	r: 100,
+	l: 60,
+	b: 60,
+	t: 30,
+	autoexpand: false
+    },
+    hovermode: 'closest',
+    showlegend: false,
+    forceRelayout: false, // Not present in Plotly library. Added to check if plot was relayouted manually.
+    titlefont: {
+	size: 12
+    }
+};
+
+
+var frequencyAverageLayout = {
+    xaxis: {
+	title: 'Frequency (GHz)',
+	hoverformat: '.4f',
+	ticks: "",
+	showgrid: false,
+	zeroline: false
+    },
+    yaxis: {
+	title: 'Flux density(Jy/beam)',
+	hoverformat: '.4f',
+	mirror: "ticks",
+	ticks: "inside",
+	tickmode: 'array',
+	showgrid: true,
+	zeroline: true
+    },
+    
+    xaxis2: {
+	zeroline: false,
+	showgrid: true,
+	ticks: 'outside',
+	side: 'bottom',
+	overlaying: 'x'
+    },
+    margin: {
+	r: 100,
+	l: 60,
+	b: 60,
+	t: 30,
+	autoexpand: false
+    },
+    hovermode: 'closest',
+    showlegend: false,
+    forceRelayout: false, // Not present in Plotly library. Added to check if plot was relayouted manually.
+    titlefont: {
+	size: 12
+    }
+};
+
+var heatmapLayoutSquare = [];
+
+var step = 1;
+
+
+
+/*
+** Round *original* number to *round* numbers after 0.
+*/
+function round(original, round) {
+  var i = 0;
+  var r = 1;
+  while(i < round) {
+    ++i;
+    r *= 10;
+  }
+  return Math.round(original * r) / r;
+}
+
+
+/*
+* The 2D image of one the frequency slice.
+* (position top left)
+*
+* 
+*   - header : the FITS header of the dataset accessible as a dictionary with FITS keywords as keys.
+*   - slice : the (0 based) index of the frequency plane to display 
+*/
+
+function drawSlice(header, slice) {
+    slice = slice ? slice : 0;
+    console.log("drawSlice : enter with slice number = ", slice);
+    console.log("drawSlice : starting retrieving data.");
+    let naxis3 = header["NAXIS3"];
+
+    $.post("",{"method":"getSlice", "slice": slice, "step": step, "fileName" : fitsFile}).done(function(resp) {
+
+	console.log("drawSlice : asynchronous function got data.");
+
+	var plotData = JSON.parse(JSON.stringify(heatmapPlot));
+	plotData.z = resp.data;
+
+	var endX = resp.data[0].length;
+	var endY = resp.data.length;
+	var stepX = parseInt(endX / 3);
+	var stepY = parseInt(endY / 3);
+
+        console.log(endX, endY, stepX, stepY, fitsFile)
+
+	$.post("", {"method": "getRangeHMS", "start": 0, "end": endX, "step": stepX, "fileName" : fitsFile}).done(function(resp) {
+	    
+	    var hms = resp.data;
+            console.log(resp.data)	    
+
+	    $.post("", {"method": "getRangeDMS", "start": 0, "end": endY, "step": stepY, "fileName" : fitsFile}).done(function(resp) {
+		
+		var dms = resp.data;
+		var rangeX = [];
+		for (var i = 0; i < endX; i += stepX) {
+		    rangeX.push(i);
+		}
+		var rangeY = [];
+		for (var j = 0; j < endY; j += stepY) {
+		    rangeY.push(j);
+		}
+		/*
+		  var velocity = round((header["CRPIX3"] + slice - 1) * (header["CDELT3"] / 1e+6) + header["CRVAL3"] / 1e+6, 0);
+		  var frequency = 0;
+		  if(header["CTYPE3"] === 'VRAD') {
+		  frequency = round((-header["CRPIX3"] + slice - 1) * header["CDELT3"] / 1e+3 + header["CRVAL3"] / 1e+3, 3);
+		  } else {
+		  frequency = round(-(header["CRPIX3"] + slice - 1) * (3e+5 * header["CDELT3"] / header["RESTFRQ"]) - 3e+5 * (header["CRVAL3"] - header["RESTFRQ"]) / header["RESTFRQ"], 3);
+		  velocity = round((header["CRPIX3"] + slice - 1) * (header["CDELT3"] / 1e+6) + header["CRVAL3"] / 1e+6, 0);
+		  }
+		*/
+
+		//var layout = JSON.parse(JSON.stringify(heatmapLayout));
+
+		var layout = heatmapLayout;
+
+		// 3rd axis : Frequency or velocity.
+		var result = linearTabulator( header["CRVAL3"],  header["CDELT3"],  header["CRPIX3"], slice+1) ;
+		if ((header["ORIGIN"] === "GILDAS Consortium")  && (header["CTYPE3"] === "VRAD")){
+		    var cunit3 = "M/S"		    
+	        }
+		else {
+	            var cunit3 =  header["CUNIT3"].toUpperCase();
+		}
+	        var ctype3 =  header["CTYPE3"].toUpperCase();
+		var frequency = null;
+		var velocity = null;
+		var restfreq = header["RESTFRQ"];
+		var crval3 = header["CRVAL3"];
+
+		if  (cunit3 in unitFactor) { 
+		    console.log("ctype3 = " + ctype3);
+		    switch (ctype3) {
+		    case "FREQ" :
+			frequency = result * unitFactor[cunit3]/unitFactor[defaultOutputUnit[ctype3]]; 
+			velocity = f2v(result, restfreq) / unitFactor["KM/S"];
+			break;
+
+		    case "VRAD":
+			velocity = result * unitFactor[cunit3]/unitFactor[defaultOutputUnit[ctype3]]; 
+			frequency = v2f(result  * unitFactor[cunit3], restfreq) / unitFactor["GHZ"];
+			break;
+
+		    case "VOPT":
+			velocity = result * unitFactor[cunit3]/unitFactor[defaultOutputUnit[ctype3]]; 
+			frequency = v2f(result  * unitFactor[cunit3], restfreq) / unitFactor["GHZ"];
+			break;
+
+		    default:
+			velocity = null;
+			frequency = null;
+			break;
+		    }
+
+
+
+
+
+		    console.log ("frequency = " + frequency + ", velocity = " + velocity );
+		    if ( frequency && velocity ) {
+			// layout.annotations=[{xref: 'paper', yref: 'paper', x: 0.5, y: 1.0, xanchor: 'middle', yanchor: 'top',
+			// 		     text: "Channel " + slice + " (Jy/beam) \n"
+			// 		     + round(velocity, 4) + " km/s "
+			// 		     + round(frequency, 4) + " GHz", 
+			// 		     showarrow: false, font:{family: 'Arial', size: 14, color: 'rgb(37,37,37)'}}];
+			layout.title = "<br>Channel " + slice + " (Jy/beam) \n" + round(velocity, 4) + " km/s "  + round(frequency, 4) + " GHz";
+
+		    }
+		    else {
+			// layout.annotations=[{xref: 'paper', yref: 'paper', x: 0.5, y: 1.0, xanchor: 'middle', yanchor: 'top',
+			// 		     text: " ",
+			// 		     showarrow: false, font:{family: 'Arial', size: 14, color: 'rgb(37,37,37)'}}];
+			layout.title = "<br>" + crval3;
+		    }
+		    
+		}
+		
+
+		layout.xaxis.tickvals = rangeX;
+		layout.xaxis.ticktext = hms;
+		layout.xaxis.range = [0, endX];
+
+		layout.yaxis.tickvals = rangeY;
+		layout.yaxis.ticktext = dms;
+		layout.yaxis.range = [0, endY];
+
+		if (gdSlice.layout) {
+		    console.log("Layout de gdSlice dans drawSlice", gdSlice.layout);
+		    if (gdSlice.layout.xaxis) {
+			layout.xaxis.range = gdAverage.layout.xaxis.range;
+		    }
+		    if (gdSlice.layout.yaxis) {
+			layout.yaxis.range = gdAverage.layout.yaxis.range;
+		    }
+		}
+
+		if ( naxis3 === 1 ) { // We want to have the possibility to draw a rectangular region of interest. 
+		    layout.dragmode = "select";
+		}
+
+		gdSlice.data = [plotData];
+		gdSlice.layout = layout;
+		Plotly.redraw(gdSlice);
+		$("#loadingId").attr('class','loading:before');
+
+		gdSlice.removeAllListeners('plotly_click');
+		gdSlice.removeAllListeners('plotly_relayout');
+		gdSlice.removeAllListeners('plotly_selected');
+
+		gdSlice.on('plotly_click',
+			   function (pdata) {
+			       var point = pdata.points[0];
+
+
+			       var ra = point.x;//(-header["CRPIX1"] + point.x + 1) * header["CDELT1"] + header["CRVAL1"];
+			       var dec = point.y;//(-header["CRPIX2"] + point.y + 1) * header["CDELT2"] + header["CRVAL2"];
+
+			       console.log("ra = " + ra + " dec = " + dec);
+
+			       $.post("", {"method": "getHMSDMS", "ra": ra, "dec": dec, "fileName" : fitsFile})
+				   .done(function(resp) {
+				       var hms = resp.data.split(" ")[0];
+				       var dms = resp.data.split(" ")[1];
+				       console.log("hms = " + hms);
+				       var layoutU = {
+					   'xaxis.tickvals': [point.x],
+					   'xaxis.ticktext': [hms],
+					   'yaxis.tickvals': [point.y],
+					   'yaxis.ticktext': [dms]
+					   //   'forceRelayout': true
+				       };
+
+				       Plotly.relayout(gdSlice, layoutU);
+
+				       layoutU.forceRelayout = true;
+
+				       //if (header["NAXIS3"] > 1) {
+					   //  gdSlice.layout.forceRelayout = true;
+					   Plotly.relayout(gdAverage, layoutU);
+					   //  }
+				       //}
+				   })
+			       
+			       if (header["NAXIS3"] > 1) {
+				   console.log('plotly_onclick call from drawSlice');
+				   drawSpectrum(header, point.xaxis.d2l(point.x) * step, point.xaxis.d2l(point.y) * step);
+			       }
+			   }
+			  );
+
+
+		if (naxis3 === 1) { // Intregration over a selected area is performed only for 2D datasets.
+		    gdSlice.on('plotly_selected',
+			       function(pdata) {
+                                   let x0 = pdata.range.x[0], x1 = pdata.range.x[1], y0 =  pdata.range.y[0], y1 =  pdata.range.y[1]
+				   $.post("",{"method":"getFreqAverage",
+					      "fileName":fitsFile,
+					      "xmin": pdata.range.x[0],
+					      "xmax": pdata.range.x[1],
+					      "ymin": pdata.range.y[0],
+					      "ymax": pdata.range.y[1] }).done(function(resp) {
+						  console.log("On this area the sum is : " + resp.data[0]);
+						  let point=pdata.range.x[0],
+						  newAnnotation = {
+						      showarrow : false,
+						      xref: 'paper',
+						      yref: 'paper',
+						      x: 0.5,
+						      y: 0.97,
+						      xanchor: 'middle',
+						      yanchor: 'top',
+						      bordercolor: 'black',
+						      borderwidth: 1,
+						      bgcolor: 'white',
+						      borderpad: 4,
+						      text : "Sum over region of interest : " + round(resp.data[0], 4)};
+						  let annotations = gdSlice.layout.annotations;
+                                                  if ((annotations || []).length >= 1) {
+						      Plotly.deleteTraces(gdSlice, -1);
+						      annotations[0] = newAnnotation;
+						  }
+						  
+						  else 
+						      if (annotations === undefined) 
+							  annotations = [newAnnotation];
+						  gdSlice.layout.annotations = annotations;
+						  Plotly.addTraces(gdSlice, {x:[x0, x1, x1, x0, x0], y:[y0, y0, y1, y1, y0], mode:'lines', line:{width:1}, name: 'Region of interest'});
+					      });
+			       }); 
+	   
+		}
+
+		gdSlice.on('plotly_afterplot', function() {
+		    gdSlice.layout.dragmode = "select";
+		});
+
+
+		gdSlice.on('plotly_relayout',
+			   function(pdata) {
+			       
+			       console.log("gdSlice layout relayout");
+
+			       if(!gdSlice.layout.forceRelayout) {
+				   if (typeof pdata['xaxis.range[0]'] !== 'undefined' && typeof pdata['xaxis.range[1]'] !== 'undefined'
+				       && typeof pdata['yaxis.range[0]'] !== 'undefined' && typeof pdata['yaxis.range[1]'] !== 'undefined') {
+				       
+				       var tmp = squareZoom(pdata['xaxis.range[0]'], pdata['xaxis.range[1]'], pdata['yaxis.range[0]'], pdata['yaxis.range[1]']);
+				       layoutU = {
+					   'xaxis.range' : tmp[0] ,
+					   'yaxis.range' : tmp[1] ,
+					   'forceRelayout' : true
+				       };
+
+				       Plotly.relayout(gdSlice, layoutU);
+				       if (header["NAXIS3"] > 1) {
+					   Plotly.relayout(gdAverage, layoutU);
+				       }
+				   }
+				   else {
+				       if (pdata['xaxis.autorange'] && pdata['yaxis.autorange']) {
+					   console.log("Autorange mode !!!");
+					   var layoutU = {
+					       'xaxis.autorange' : true,
+					       'yaxis.autorange' : true,
+					       'forceRelayout' : true
+					   };
+
+					   if ( naxis3 > 1 ) 
+					       Plotly.relayout(gdAverage, layoutU);
+				       }
+				   }
+			       }
+			       else {
+				   gdSlice.layout.forceRelayout = false;
+			       }
+			   }
+			  );
+		
+		++plotsLoaded;
+		
+	    });
+	});
+    });
+}
+
+
+/*
+ * The 2D image of average on the frequency slices.
+ * (position bottom left)
+ * div : gdAverage.
+ */
+
+function drawPlotAverage(header, zmin, zmax) {
+    console.log("drawPlotAverage: entering");
+    $.post("",{"method":"getAverage", "fileName" : fitsFile, "step": step, "zmin": zmin, "zmax": zmax}).done(function(resp) {
+	console.log("Right after average calculation done by the python server, about to update the plot...");
+ 
+	// Creating copy of object with parse(stringify())
+	var plotData = JSON.parse(JSON.stringify(heatmapPlot));
+
+	plotData.z = resp.data;
+
+	var endX = resp.data[0].length;
+	var endY = resp.data.length;
+
+	var stepX = parseInt(endX / 3);
+	var stepY = parseInt(endY / 3);
+	
+       
+	$.post("", {"method": "getRangeHMS", "start": 0, "end": endX, "step": stepX, "fileName" : fitsFile}).done(function(resp) {
+	    
+	    var hms = resp.data;
+            
+
+	    $.post("", {"method": "getRangeDMS", "start": 0, "end": endY, "step": stepY, "fileName" : fitsFile}).done(function(resp) {
+
+		var dms = resp.data;
+		var rangeX = [];
+		for (var i = 0; i < endX; i += stepX) {
+		    rangeX.push(i);
+		}
+		var rangeY = [];
+		for (var j = 0; j < endY; j += stepY) {
+		    rangeY.push(j);
+		}
+
+		var layout = JSON.parse(JSON.stringify(heatmapLayout));
+
+		layout.title = "Averaged Spectrum"
+
+		layout.xaxis.range = [0, endX];
+		layout.xaxis.tickvals = rangeX;
+		layout.xaxis.ticktext = hms;
+		layout.xaxis.title = "Absolute coordinates";
+
+		layout.yaxis.range = [0, endY];
+		layout.yaxis.tickvals = rangeY;
+		layout.yaxis.ticktext = dms;
+		//layout.yaxis.title = "$\\text{Area }(Jy / beam \\cdot km / s)$";
+		layout.yaxis.title = "Area(Jy / beam . km / s)";
+		layout.dragmode = "select";
+		layout.shapes = heatmapLayoutSquare;
+
+		if (typeof gdSlice.layout !== 'undefined') {
+		    if (typeof gdSlice.layout.xaxis !== 'undefined') {
+			layout.xaxis.range = gdSlice.layout.xaxis.range;
+		    }
+		    if (typeof gdSlice.layout.yaxis !== 'undefined') {
+			layout.yaxis.range = gdSlice.layout.yaxis.range;
+		    }
+		}
+
+		//gdAverage.data = [plotData, scatterPointPlot];
+		gdAverage.data = [plotData];
+		gdAverage.layout = layout;
+		Plotly.redraw(gdAverage);
+		$("#loadingId").attr('class','loading:before');
+
+		// Plotly.newPlot(gdAverage, [plotData, scatterPointPlot], layout);
+
+		gdAverage.removeAllListeners('plotly_click');
+		gdAverage.removeAllListeners('plotly_relayout');
+		gdAverage.removeAllListeners('plotly_selected');
+
+		gdAverage.on('plotly_click',
+			     function(pdata){
+				 var point = pdata.points[0];
+				 var ra = point.x;//(-header["CRPIX1"] + point.x + 1) * header["CDELT1"] + header["CRVAL1"];
+				 var dec = point.y;//(-header["CRPIX2"] + point.y + 1) * header["CDELT2"] + header["CRVAL2"];
+
+				 $.post("", {"method": "getHMSDMS", "ra": ra, "dec": dec, "fileName" : fitsFile}).done(function(resp) {
+				     var hms = resp.data.split(" ")[0];
+				     var dms = resp.data.split(" ")[1];
+				     var layoutU = {
+					 'xaxis.tickvals': [point.x],
+					 'xaxis.ticktext': [hms],
+					 'yaxis.tickvals': [point.y],
+					 'yaxis.ticktext': [dms]
+				     };
+
+				     Plotly.relayout(gdAverage, layoutU);
+
+				     layoutU.forceRelayout = true;
+
+				     Plotly.relayout(gdSlice, layoutU);
+				 });
+
+				 drawSpectrum(header, point.xaxis.d2l(point.x)  * step, point.xaxis.d2l(point.y) * step);
+			     }
+			    );
+
+		gdAverage.on('plotly_relayout',
+			     function(pdata) {
+				 console.log("gdAverage layout relayout: ", gdAverage.layout);
+				 gdAverage.layout.dragmode="select";
+				 if(!gdAverage.layout.forceRelayout) {
+				     if (typeof pdata['xaxis.range[0]'] !== 'undefined' && typeof pdata['xaxis.range[1]'] !== 'undefined'
+					 && typeof pdata['yaxis.range[0]'] !== 'undefined' && typeof pdata['yaxis.range[1]'] !== 'undefined') {
+					 console.log("About to relayout gdSlice with layoutU");
+
+					 var tmp = squareZoom(pdata['xaxis.range[0]'], pdata['xaxis.range[1]'], pdata['yaxis.range[0]'], pdata['yaxis.range[1]']);
+					 var layoutU = {
+					     'xaxis.range' :  tmp[0],
+					     'yaxis.range':   tmp[1],
+					     'forceRelayout': true
+					 };
+
+					 console.log("xaxis.range = " + pdata["xaxis.range[0]"] + ", " + pdata["xaxis.range[1]"]);
+					 console.log("Explicit relayout of gdAverage");
+					 Plotly.relayout(gdSlice, layoutU);
+					 Plotly.relayout(gdAverage, layoutU);
+				     }
+				     else {
+					 if (pdata['xaxis.autorange'] && pdata['yaxis.autorange']) {
+					     var layoutU2 = {
+						 'xaxis.autorange':   true,
+						 'yaxis.autorange':   true,
+						 'forceRelayout': true
+					     };
+					     Plotly.relayout(gdSlice, layoutU2);
+					 }
+				     }
+				 }
+				 else {
+				     gdAverage.layout.forceRelayout = false;
+				 }
+			     }
+			    );
+
+		gdAverage.on('plotly_selected',
+			     function(pdata) {
+				 console.log("selected")
+				 var ind0 = parseInt(pdata.range.x[0]);
+				 var ind1 = parseInt(pdata.range.x[1]);
+
+				 var x0 = pdata.range.x[0];
+				 var x1 = pdata.range.x[1];
+				 var y0 = pdata.range.y[0];
+				 var y1 = pdata.range.y[1];
+
+				 var shapes = [
+				     {
+					 type: 'rect',
+					 xref: 'x',
+					 yref: 'y',
+					 x0: x0,
+					 y0: y0,
+					 x1: x1,
+					 y1: y1,
+					 line: {
+					     color: 'black'
+					 }
+				     }
+				 ];
+
+				 heatmapLayoutSquare = shapes;
+
+				 var layoutU = {
+				     shapes: shapes
+				 };
+
+				 Plotly.relayout(gdAverage, layoutU);
+
+				 //				 drawSpectrumAverage(header, y0 * step, y1 * step, ind0 * step, ind1 * step, zmin, zmax);
+				 drawSpectrumAverage(header, ind0 * step, ind1 * step, y0 * step, y1 * step, zmin, zmax);
+			     },
+			     false);
+
+		++plotsLoaded;
+		console.log("...plot updated");
+	    });
+	});
+    });
+    console.log("drawPlotAverage: exiting");
+}
+
+
+/*
+ * The 1D plot of one spectrum for one given position (ra, dec).
+ * (position top right)
+ *
+ * div : gdSpectrum
+ *
+ * - header the FITS header of the product structures as dictionary with keys equal to the FITS keywords found in the header.
+ * - a coordinate along the 1st axis. Typically a right ascension. Units are CRPIX.
+ * - a coordinate along the 2nd axis. Typically a declination. Units are CRPIX.
+ */
+function drawSpectrum(header, x, y) {
+    console.log("drawSpectrum : entering with x=" + x +", y="+y);
+    if (typeof x === 'undefined') {
+	x = Math.floor(header["NAXIS1"] / 2 );
+    }
+    if (typeof y === 'undefined') {
+	y = Math.floor(header["NAXIS2"] / 2 );
+    }
+    console.log("drawSpectrum plotting at x=" + x +", y="+y);
+
+    $.post("",{"method":"getFreq","fileName":fitsFile, "x": x,"y": y}).done(function(resp) {
+
+	var xIndexes = Array.apply(null, Array(resp.data.length)).map(function(x, i) { return i; });
+	var xData = new Array(resp.data.length);
+
+	// Draw x-axis in Frequencies (plot on top right)
+	let ctype3 = header["CTYPE3"].toUpperCase();
+	let crpix3 = header["CRPIX3"];
+	let crval3 = header["CRVAL3"];
+	let cdelt3 = header["CDELT3"];
+        if ((header["ORIGIN"] === "GILDAS Consortium") && (header["CTYPE3"] === "VRAD")){
+	    var cunit3 = "M/S"
+        }
+	else {  
+            var cunit3 = header["CUNIT3"].toUpperCase();
+       } 
+  	let restfreq = header["RESTFRQ"];
+	let specsys = header["SPECSYS"];
+	let rlen   =  resp.data.length;
+
+	for (var i = 0; i < rlen; i++) {
+	    let tmp = linearTabulator(crval3, cdelt3, crpix3, i+1);
+	    if (cunit3 in unitFactor) {
+		switch (ctype3) {
+		case 'FREQ' :
+		    if (cdelt3 > 0) { 
+			xData[rlen-i-1] = tmp * unitFactor[cunit3] / unitFactor[defaultOutputUnit[ctype3]];
+		    }
+		    else {
+			xData[i] = tmp * unitFactor[cunit3] / unitFactor[defaultOutputUnit[ctype3]];
+		    }
+		    break;
+		    
+		case 'VRAD':
+		    let tmp1 = v2f(tmp * unitFactor[cunit3] , restfreq) / unitFactor[defaultOutputUnit['FREQ']];
+		    if (cdelt3 > 0) { 
+			xData[i] = tmp1;
+		    }
+		    else {
+			xData[rlen-i-1] = tmp1;
+		    } 
+		    break;
+		    
+		default:
+		    break;
+		}
+		
+	    }
+	}
+
+	var plotData = JSON.parse(JSON.stringify(frequencyPlot));
+	plotData.x = xIndexes;
+	plotData.y = resp.data;
+	
+	var maxVal = Math.max.apply(Math, plotData.y);
+	var minVal = Math.min.apply(Math, plotData.y);
+        
+	frequencyMarker.x = [xIndexes[0]];
+	frequencyMarker.y = [0.0];
+	
+	var pi180 = Math.PI / 180 / 4.86e-6;
+	
+
+	var layout = frequencyLayout;	
+	//layout.title = "$\\text{B: }" + round(header["BMAJ"] * pi180, 1) + "\\times" + round(header["BMIN"] * pi180, 1) + "\\text{ PA }" + round(header["BPA"], 0) + "^{\\circ}" + "$";
+	layout.title = "B: " + round(header["BMAJ"] * pi180, 1) + "x" + round(header["BMIN"] * pi180, 1) + " PA " + round(header["BPA"], 0) + "°";
+	layout.xaxis.tickvals = xIndexes;
+	layout.xaxis.tickmode = "array";
+	layout.xaxis.ticktext = xData;
+	layout.xaxis.showticklabels = false;
+	layout.xaxis.title += " " + specsys;
+	
+	
+	switch (ctype3) {
+	case 'FREQ' :
+	    if (header["CDELT3"] < 0) { 
+		layout.xaxis.range = [0, resp.data.length];
+	    }
+	    else {
+		layout.xaxis.range = [resp.data.length, 0];
+	    }
+	    break;
+	    
+	case 'VRAD':
+	    if (header["CDELT3"] < 0) { 
+		layout.xaxis.range = [resp.data.length, 0];
+	    }
+	    else {
+		layout.xaxis.range = [0, resp.data.length];
+	    }
+	    break;
+
+	default:
+	    layout.xaxis.range =  [0, resp.data.length];
+	    
+	}
+
+	//layout.xaxis.title = "$\\text{Frequency (GHz)}$";
+	
+	layout.xaxis2.range = [xData[0], xData[xData.length-1]];
+	layout.xaxis2.tickvals = xIndexes;
+	layout.xaxis2.tickmode = "auto";
+	
+	//layout.yaxis.title = "$\\text{Flux (Jy/beam)}$";
+	layout.yaxis.range = [minVal, maxVal];
+
+
+	// Display a graduation in brightness temperature on the right side of the plot.
+	// It's all about converting flux density into brightness temperature.
+	let midFrequency = (xData[0] + xData[xData.length-1]) / 2.0;
+	let d2r = Math.PI / 180.;
+	let bmaj = header["BMAJ"] * d2r;
+	let bmin = header["BMIN"] * d2r;
+	let omega = Math.PI * bmin * bmaj / 4.0 / Math.log(2.0);
+	let lambda = f2lambda(midFrequency * unitFactor["GHZ"]);
+	console.log("lambda = " + lambda);
+	let conversionFactor = lambda * lambda / 2. / 1.38064852e-23 / omega * 1.e-26;
+	let kmin = minVal * conversionFactor;
+	let kmax = maxVal * conversionFactor;
+	layout.yaxis2.range = [kmin, kmax];
+
+	//var frequencyAxisOne = JSON.parse(JSON.stringify(frequencyAxis));
+	//frequencyAxisOne.x = xData;
+	
+	gdSpectrum.data = [plotData, frequencyMarker];
+	gdSpectrum.layout = layout;
+	console.log("About to plot frequency/flux graph");
+	Plotly.redraw(gdSpectrum);
+	
+	gdSpectrum.removeAllListeners('plotly_click');
+	gdSpectrum.removeAllListeners('plotly_relayout');
+	
+	gdSpectrum.on('plotly_click',
+		      function(pdata) {
+			  $("#loadingId").attr('class','loading');
+			  console.log("A click occurred in gdSpectrum : enter");
+			  var point = pdata.points[0];
+			  console.log("the click occurred at ", point.xaxis.d2l(point.x));
+			  
+			  // Update the slice to the selected frequency.
+			  drawSlice(header, point.xaxis.d2l(point.x));
+			  
+			  // Update the position of the red dot at the right frequency :
+			  frequencyMarker.x = [xIndexes[ point.xaxis.d2l(point.x)]];
+			  
+			  // 1) In the frequency-flux graph:
+			  Plotly.redraw(gdSpectrum);
+			  
+			  //  2) In the frequency-integrated flux grach
+			  Plotly.redraw(gdFreqAverage);
+			  
+			  console.log("A click occurred in gdSpectrum : exit");
+		      }
+		     );
+	
+	gdSpectrum.on('plotly_relayout',
+		      function(pdata){
+			  console.log("Function called for a relayout in gdSpectrum : enter");
+			  if (!gdSpectrum.layout.forceRelayout ) {
+			      var layoutU;
+			      console.log("forceRelayout = " + gdSpectrum.layout.forceRelayout);
+			      if (typeof pdata['xaxis.range[0]'] !== 'undefined' && typeof pdata['xaxis.range[1]'] !== 'undefined') {
+				  Plotly.relayout(gdSpectrum, {
+				      'xaxis.range':   [pdata['xaxis.range[0]'], pdata['xaxis.range[1]']],
+				      'yaxis.range':   [minVal, maxVal]
+				  })				  
+				  layoutU = {
+				      'xaxis.range':   [pdata['xaxis.range[0]'], pdata['xaxis.range[1]']],
+				      'yaxis.autorange':  true,
+				      //'yaxis2.autorange': true,
+				      'forceRelayout': true
+				  };
+				  console.log("if - layoutU = " + JSON.stringify(layoutU));
+			      }
+			      else {
+				  layoutU = {
+				      'xaxis.range': gdSpectrum.layout.xaxis.range ,
+				      'yaxis.autorange':  true,
+				      //'yaxis2.autorange': true,
+				      'forceRelayout': true
+				  };
+				  console.log("else - layoutU = " + JSON.stringify(layoutU));
+			      }
+			      console.log("Calling for a relayout of gdFreqAverage");
+			      Plotly.relayout(gdFreqAverage, layoutU);
+			  }
+			  else {
+			      gdSpectrum.layout.forceRelayout = false;
+			  }
+			  console.log("Function called for a relayout in gdSpectrum : exit.");
+		      }
+		     );
+	
+	++plotsLoaded;
+	
+    });
+    
+}
+
+
+/*
+ * A utility behaves almost like the range function in Python.
+ */
+function range(start, count) {
+    return Array.apply(null, Array(count))
+	.map(function (element, index) {
+	    return index + start;
+	});
+}
+
+
+/*
+ * A 1D plot of the sum of flux over all the positions for each frequency.
+ * (position bottom right)
+ *
+ * div : gdFreqAverage.
+ */
+function drawSpectrumAverage(header, xmin, xmax, ymin, ymax, zmin, zmax) {
+    console.log("drawSpectrumAverage : entering");
+    
+    
+    $.post("",{"method":"getFreqAverage", "fileName":fitsFile, "xmin": xmin, "xmax": xmax, "ymin": ymin, "ymax": ymax }).done(function(resp) {
+	
+	console.log("drawSpectrumAverage : callback got Average freqs: ");
+	
+	var cdelt2 = 3e+5 * Math.abs(header["CDELT3"] / header["RESTFRQ"]);
+	var res = 0;
+	var start = zmin ? zmin : 0;
+	var end = zmax ? zmax : resp.data.length;
+
+	var xIndexes = Array.apply(null, Array(resp.data.length)).map(function(x, i) { return i; });
+	var xData = new Array(resp.data.length);	
+	
+	// Draw x-axis in Velocities (plot on bottom right) 			   
+	let ctype3 = header["CTYPE3"].toUpperCase();
+	let crpix3 = header["CRPIX3"];
+	let crval3 = header["CRVAL3"];
+	let cdelt3 = header["CDELT3"];
+        if ((header["ORIGIN"] === "GILDAS Consortium") && (header["CTYPE3"] === "VRAD")){
+	    var cunit3 = "M/S"
+         }
+	else {  
+	    var cunit3 = header["CUNIT3"].toUpperCase();
+	}
+	let restfreq = header["RESTFRQ"];
+	let specsys = header["SPECSYS"];
+	let cdelt3prim = speedOfLight * cdelt3 / restfreq; 
+	let rlen   =  resp.data.length;
+
+        for (var i = 0; i < rlen; i++) {
+            let tmp = linearTabulator(crval3, cdelt3, crpix3, i+1);
+            if (cunit3 in unitFactor) {
+                switch (ctype3) {
+                case 'VRAD' :
+                    if (cdelt3 > 0) {
+                        xData[i] = tmp * unitFactor[cunit3] / unitFactor[defaultOutputUnit[ctype3]];
+                    }
+                    else {
+                        xData[rlen-i-1] = tmp * unitFactor[cunit3] / unitFactor[defaultOutputUnit[ctype3]];
+                    }
+                    break;
+
+                case 'FREQ':
+                    let tmp1 = f2v(tmp * unitFactor[cunit3], restfreq) / unitFactor[defaultOutputUnit['VRAD']];
+                    if (cdelt3 > 0) {
+                        xData[rlen-i-1] = tmp1;
+                    }
+                    else {
+                        xData[i] = tmp1;
+                    }
+                    break;
+
+                default:
+                    break;
+                }
+
+            }
+        }
+
+
+//	for (var i = 0; i < rlen; i++) {
+//	    result = linearTabulator(crval3, cdelt3, crpix3, i+1);
+//	    if (cunit3 in unitFactor) {
+//		switch (ctype3) {
+//		case 'FREQ':
+//		    xData[i] = f2v(result * unitFactor[cunit3], restfreq) /  unitFactor[defaultOutputUnit['VRAD']];
+//		    break;
+//
+//		case 'VRAD':
+//		    xData[rlen - i - 1] = result * unitFactor[cunit3] / unitFactor[defaultOutputUnit[ctype3]];
+//		    break;
+//
+//		default :
+//		    break;
+//		}
+//	    }
+//	}
+	
+	if (res === 0) {
+	    for (var i = start; i < end; ++i) {
+		res += resp.data[i];
+	    }
+	    res *= cdelt3prim;
+	}
+	
+	var plotData = JSON.parse(JSON.stringify(frequencyPlot));
+	plotData.x = xIndexes;
+	plotData.y = resp.data;
+	
+	var maxVal = Math.max.apply(Math, resp.data);
+	var minVal = Math.min.apply(Math, resp.data);
+	
+	frequencyMarker.x = [xIndexes[0]];
+	frequencyMarker.y = [0.0];
+	
+	var layout = JSON.parse(JSON.stringify(frequencyAverageLayout));
+	layout.title = round(res, 4) +" (Jy . km / s)";
+	
+	layout.xaxis.title = 'Velocity (km/s)' + ' ' + specsys;
+	layout.xaxis.tickvals = xIndexes;
+	layout.xaxis.ticktext = xData;
+	layout.xaxis.showticklabels = false;
+
+	
+	layout.xaxis2.range = [xData[0], xData[xData.length-1]];
+	layout.xaxis2.tickvals = xIndexes;
+	layout.xaxis2.tickmode = "auto";
+	
+
+        switch (ctype3) {
+        case 'FREQ' :
+            if (header["CDELT3"] < 0) {
+                layout.xaxis.range = [0, resp.data.length];
+            }
+            else {
+                layout.xaxis.range = [resp.data.length, 0];
+            }
+            break;
+
+        case 'VRAD':
+            if (header["CDELT3"] < 0) {
+                layout.xaxis.range = [resp.data.length, 0];
+            }
+            else {
+                layout.xaxis.range = [0, resp.data.length];
+            }
+            break;
+
+        default:
+            layout.xaxis.range =  [0, resp.data.length];
+
+        }
+
+
+//	if (header["CDELT3"] < 0) {
+//	    layout.xaxis.range = [0, resp.data.length];
+//	} else {
+//	    layout.xaxis.range = [resp.data.length, 0];
+//	}
+	
+	layout.yaxis.title = "Integrated Flux (Jy)";
+	layout.yaxis.range = [minVal, maxVal];
+	layout.dragmode = "select";
+	
+	console.log("Frequency plot border length : ", frequencyPlotBorder.y.length);
+	
+	frequencyPlotBorder.x = plotData.x;
+	frequencyPlotBorder.y = Array.apply(null, Array(plotData.x.length)).map(function(x, i) { return plotData.y[i]; });
+	frequencyPlotBorder.fill = 'tozeroy';
+	frequencyPlotBorder.fillcolor = "yellow";
+	
+	var frequencyAxisOne = JSON.parse(JSON.stringify(frequencyAxis));
+	frequencyAxisOne.x = xData;
+	
+	gdFreqAverage.data = [ plotData, frequencyPlotBorder, frequencyMarker ];
+	gdFreqAverage.layout = layout;
+	Plotly.redraw(gdFreqAverage);
+	
+	gdFreqAverage.removeAllListeners('plotly_click');
+	gdFreqAverage.removeAllListeners('plotly_relayout');
+	gdFreqAverage.removeAllListeners('plotly_selected');
+	
+	/* I don't see the point... I comment out
+	   gdFreqAverage.on('plotly_click',
+	   function(pdata) {
+	   var point = pdata.points[0];
+	   var update = {
+	   x:         [[point.x, point.x]]
+	   };
+	   
+	   Plotly.restyle(gdSpectrum, update, 1);
+	   Plotly.restyle(gdSpectrums, update, 2);
+	   drawSlice(header, point.x);
+	   }
+	   );
+	*/
+	gdFreqAverage.on('plotly_relayout',
+			 function(pdata){
+
+			     console.log("gdFreqAverage relayout : Entering.");
+			     //var layoutU;
+			     if(!gdFreqAverage.layout.forceRelayout) {
+				 if (typeof pdata['xaxis.range[0]'] !== 'undefined' && typeof pdata['xaxis.range[1]'] !== 'undefined') {
+				     var layoutU = {
+					 'xaxis.range':   [pdata['xaxis.range[0]'], pdata['xaxis.range[1]']],
+					 'yaxis.autorange': true,
+					 'yaxis.autorange': true,
+					 'forceRelayout': true
+				     };
+				     Plotly.relayout(gdSpectrum, layoutU);
+				 }
+				 else {
+				     var layoutU = {
+					 'xaxis.range': gdFreqAverage.layout.xaxis.range ,
+					 'yaxis.autorange':  true,
+					 'yaxis2.autorange': true
+				     };
+				     Plotly.relayout(gdSpectrum, layoutU);
+				 }
+			     }
+			     else {
+				 gdFreqAverage.layout.forceRelayout = false;
+			     }
+			     console.log("gdFreqAverage relayout : Exiting.");
+			 }
+			);
+
+
+	gdFreqAverage.on('plotly_selected',
+			 function(pdata){
+
+			     $("#loadingId").attr('class','loading');
+			     
+
+			     if (pdata == undefined) {
+				 $("#loadingId").attr('class','loading:before');
+				 return;
+			     }
+
+			     var xmin = Math.round(pdata.range.x[0]);
+			     var xmax = Math.round(pdata.range.x[1]);
+			    
+			     
+			     var ind0 = Math.floor(pdata.range.x[0]) + 1;
+			     var ind1 = Math.floor(pdata.range.x[1]) + 1;
+			     
+			     var y = resp.data.slice(); //new Array(ind1 - ind0);
+			     
+			     frequencyPlotBorder.x=range(xmin, xmax-xmin+1);
+			     frequencyPlotBorder.y=Array.apply(null, Array(frequencyPlotBorder.x.length)).map(function(x, i) { return y[i+xmin]; });
+			     
+			     for (i = xmin, res = 0; i < xmax+1; ++i) {
+				 res += resp.data[i];
+			     }
+			     
+			     res *= cdelt2;
+			     gdFreqAverage.layout.title = round(res, 4) + '(Jy . km / s)';
+			     Plotly.redraw(gdFreqAverage);
+			     drawPlotAverage(header, xmin, xmax);
+			 },
+			 false);
+	
+	++plotsLoaded;
+	
+    });
+    
+}
+
+
+function resizeWindow(){
+    WIDTH = document.documentElement.clientWidth;
+    HEIGHT = document.documentElement.clientHeight;
+    minWH = WIDTH < HEIGHT ? WIDTH : HEIGHT;
+    maxWH = WIDTH > HEIGHT ? WIDTH : HEIGHT;
+
+    gd3Spectrum = d3.select('#plotSpectrum')
+	.style({
+	    width: WIDTH - minWH / 2 - listWidth + 'px',
+	    height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+	    display: 'inline-block'
+	});
+    gd3FreqAverage = d3.select('#plotFreqAverage')
+	.style({
+	    width: WIDTH - minWH / 2 - listWidth + 'px',
+	    height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+	    display: 'inline-block'
+	});
+    gd3Objects = d3.select('#objectsListParent')
+	.style({
+	    width: listWidth  + 2*scrlBar + 'px',
+	    height: HEIGHT + 'px',
+	    overflow: 'hidden'
+	});
+    gd3Files = d3.select('#filesListParent')
+	.style({
+	    width: document.documentElement.clientWidth / 3 + 2*scrlBar + 'px',
+	    height: document.documentElement.clientHeight - 50 + 'px',
+	    overflow: 'hidden',
+	    position: 'absolute'
+	});
+    gd3Header = d3.select('#headerTableParent')
+	.style({
+	    width: document.documentElement.clientWidth / 3 * 2 + 'px',
+	    height: document.documentElement.clientHeight - 50 + 'px',
+	    overflow: 'hidden',
+	    position: 'absolute'
+	});
+
+    gdSpectrum = gd3Spectrum.node();
+    gdFreqAverage = gd3FreqAverage.node();
+}
+
+window.addEventListener('resize', function(event){
+
+    WIDTH = document.documentElement.clientWidth;
+    HEIGHT = document.documentElement.clientHeight;
+    minWH = WIDTH < HEIGHT ? WIDTH : HEIGHT;
+    maxWH = WIDTH > HEIGHT ? WIDTH : HEIGHT;
+
+    gd3Spectrum = d3.select('#plotSpectrum')
+	.style({
+	    width: WIDTH - minWH / 2 - listWidth + 'px',
+	    height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+	    display: 'inline-block'
+	});
+    gd3FreqAverage = d3.select('#plotFreqAverage')
+	.style({
+	    width: WIDTH - minWH / 2 - listWidth + 'px',
+	    height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+	    display: 'inline-block'
+	});
+    gd3Objects = d3.select('#objectsListParent')
+	.style({
+	    width: listWidth  + 2*scrlBar + 'px',
+	    height: HEIGHT + 'px',
+	    overflow: 'hidden'
+	});
+    gd3Files = d3.select('#filesListParent')
+	.style({
+	    width: document.documentElement.clientWidth / 3 + 2*scrlBar + 'px',
+	    height: document.documentElement.clientHeight - 50 + 'px',
+	    overflow: 'hidden',
+	    position: 'absolute'
+	});
+    gd3Header = d3.select('#headerTableParent')
+	.style({
+	    width: document.documentElement.clientWidth / 3 * 2 + 'px',
+	    height: document.documentElement.clientHeight - 50 + 'px',
+	    overflow: 'hidden',
+	    position: 'absolute'
+	});
+
+
+    Plotly.Plots.resize(gdSlice);
+    Plotly.Plots.resize(gdSpectrum);
+    Plotly.Plots.resize(gdAverage);
+    Plotly.Plots.resize(gdFreqAverage);
+});
+
+function setBarPlot() {
+
+    /*
+      WIDTH = document.documentElement.clientWidth;
+      HEIGHT = document.documentElement.clientHeight;
+      minWH = WIDTH < HEIGHT ? WIDTH : HEIGHT;
+      maxWH = WIDTH > HEIGHT ? WIDTH : HEIGHT;
+
+      gd3Spectrum = d3.select('#plotSpectrum')
+      .style({
+      width: WIDTH - minWH / 2 - listWidth + 'px',
+      height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+      display: 'inline-block'
+      });
+      gd3FreqAverage = d3.select('#plotFreqAverage')
+      .style({
+      width: WIDTH - minWH / 2 - listWidth + 'px',
+      height: HEIGHT_IN_PERCENT_OF_PARENT + 'vmin',
+      display: 'inline-block'
+      });
+      gd3Objects = d3.select('#objectsListParent')
+      .style({
+      width: listWidth  + 2*scrlBar + 'px',
+      height: HEIGHT + 'px',
+      overflow: 'hidden'
+      });
+      gd3Files = d3.select('#filesListParent')
+      .style({
+      width: document.documentElement.clientWidth / 3 + 2*scrlBar + 'px',
+      height: document.documentElement.clientHeight - 50 + 'px',
+      overflow: 'hidden',
+      position: 'absolute'
+      });
+      gd3Header = d3.select('#headerTableParent')
+      .style({
+      width: document.documentElement.clientWidth / 3 * 2 + 'px',
+      height: document.documentElement.clientHeight - 50 + 'px',
+      overflow: 'hidden',
+      position: 'absolute'
+      });
+
+      gdSpectrum = gd3Spectrum.node();
+      gdFreqAverage = gd3FreqAverage.node();
+    */
+    addObjects();
+    addHistory();
+
+    $.post("", {"method": "getHeader", "name": fitsFile})
+	.done(function(resp) {
+	    if (resp.error) {
+		plotsLoaded = 4;
+		console.log(resp.error);
+		$("#plotsParent")
+		    .html('<p "style"="color: red;"><strong>' + resp.error + '</strong></p>')
+		    .css({'width': WIDTH - listWidth,
+			  'word-wrap': 'break-word'});
+	    }
+	    else {
+		headerData = resp.data;
+		var header = resp.data;
+		var pathParts = fitsFile.split('/');
+		var fileName = pathParts[pathParts.length - 1];
+		var fileInfo = '<strong>' + fileName + '</strong> - OBJECT = <strong>' + header['OBJECT'] + '</strong> - NAXIS = <strong>'+header['NAXIS'] + '</strong> - NAXIS1 = <strong>' + header['NAXIS1']  + '</strong> - NAXIS2 = <strong>' + header['NAXIS2'] + '</strong> - NAXIS3 = <strong>' + header['NAXIS3']  + '</strong>';
+		if ('NAXIS4' in header) {
+		    fileInfo += ' - NAXIS4 = <strong>'+header['NAXIS4']+'</strong>';
+		} 
+		fileInfo += " <a href='javascript:showHeader()'> etc.</a>";
+		$("#info")
+		    .html(fileInfo );
+		for (i = 1; i < Number(header['NAXIS'])+1; i++); // { $('#info').add(' - NAXIS' + i + '= '); }
+		$("info").css('font-family: monospace; font-size=x-small');
+
+
+		var headerTable = $('#header > table');
+		headerTable.empty();
+		var header2 = jQuery.extend(true, {}, header);
+		headerTable.append('<tr><td><span>OBJECT: ' + header2["OBJECT"] + '</span></td><td><span>&nbsp;</span></td></tr>');
+
+//		delete header["Header"]["OBJECT"];
+
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		/* History keywords */
+		var mks = extractKeywords(historyKeywords_, header2);
+		for (var mk in mks) {
+		    headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+		}
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		/* describing observation keywords */
+		var mks = extractKeywords(describingObservationKeywords_, header2);
+		for (var mk in mks) {
+		    headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+		}
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		/* The rest frequency */
+		var mks = extractKeywords(restFrqKeywords_, header2);
+		for (var mk in mks) {
+		    headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+		}
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		/* The mandatory keywords */
+		var mks = extractKeywords(mandatoryKeywords_, header2);
+		for (var mk in mks) {
+		    headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+		}
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		/* The beam size keywords */
+		var mks = extractKeywords(beamSizeKeywords_, header2);
+		for (var mk in mks) {
+		    headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+		}
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		/* The array keywords */
+		var mks = extractKeywords(arrayKeywords_, header2);
+		for (var mk in mks) {
+		    headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+		}
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		/* The geographic location of the observation (m) */
+		var mks = extractKeywords(obsGeoKeywords_, header);
+		for (var mk in mks) {
+		    headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+		}
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		/* The PC keywords */
+		var PCKeywords_ = keywordsByRegex(header, /PC\d\d/);
+		var mks = extractKeywords(PCKeywords_, header2);
+		for (var mk in mks) {
+		    headerTable.append('<tr><td><span>' + mk + '</span></td><td><span>' + mks[mk] + '</span></td></tr>');
+		}
+		headerTable.append('<tr><td>--------</td><td>----------</td></tr>');
+		
+		
+		/* The rest */
+		kws=[];
+		for (var kw in header2) {
+		    kws[kws.length] = kw;
+		}
+		
+		/* is listed by alphabetical order */
+		kws = kws.sort();
+		for (i = 0; i < kws.length; i++)  {
+		    headerTable.append('<tr><td><span>' + kws[i] + '</span></td><td><span>' + header2[kws[i]] + '</span></td></tr>');
+		}
+
+		//heatmapLayout.title = "Source: " + header["OBJECT"];
+
+		if (header["NAXIS3"] === 1) {
+
+		    gd3Slice = d3.select('#plotSlice')
+			.style({
+			    width:   90 + 'vmin',
+			    height:  90 + 'vmin',
+			    display: 'inline-block'
+			});
+		    gd3Average = d3.select('#plotAverage')
+			.style({
+			    width:   0 + 'vh',  //WIDTH_IN_PERCENT_OF_PARENT + '%',
+			    height:  0 + 'vh',
+			    display: 'inline-block'
+			});
+		    gd3Spectrum = d3.select('#plotSpectrum')
+			.style({
+			    width:   0 + 'vw',
+			    height:  0 + 'vh',
+			    display: 'inline-block'
+			});
+		    gd3FreqAverage = d3.select('#plotFreqAverage')
+			.style({
+			    width:   0 + 'vw',
+			    height:  0 + 'vh',
+			    display: 'inline-block'
+			});
+
+		    Plotly.newPlot(gdSlice, heatmapPlot, heatmapLayout);
+		    plotsLoaded = 3;
+		    drawSlice(header);
+		}
+		else {
+		    Plotly.newPlot(gdSlice, heatmapPlot, heatmapLayout);
+		    Plotly.newPlot(gdSpectrum, frequencyPlot, frequencyLayout);
+		    Plotly.newPlot(gdAverage, heatmapPlot, heatmapLayout);
+		    Plotly.newPlot(gdFreqAverage, frequencyPlot, frequencyAverageLayout);
+
+		    drawSlice(header);
+		    drawSpectrum(header);
+		    drawPlotAverage(header);
+		    drawSpectrumAverage(header);
+		}
+	    }
+	})
+	.fail(function(xhr, status, error) {
+	    // error handling
+	    console.log(xhr, status, error);
+	});
+}
+
+//setBarPlot();
+
+
+function onReady(callback) {
+    var intervalID = window.setInterval(checkReady, 1000);
+
+    function checkReady() {
+	if (plotsLoaded > 3) {
+	    window.clearInterval(intervalID);
+	    callback.call(this);
+	}
+    }
+}
+
+function show(id, value) {
+    document.getElementById(id).style.display = value ? 'block' : 'none';
+}
+
+$(document).ready(function() {setBarPlot();});
+
+function checkBoxChanged(obj){
+    //console.log('Changed');
+    if($(obj).is(":checked")){
+	//console.log('Checked')
+	showAllChecked = true;
+	showAllExt(allFilesInOverlayNav);
+    }else{
+	//console.log('Not Checked');
+	showAllChecked = false;
+	notShowAllExt(allFilesInOverlayNav);
+    }
+}
+
+function showAllExt(obj){
+    // clear the existing list
+    $('#filesList ul li').remove();
+
+    for (var c = 0; c < obj.length; ++c) {
+	var parts = obj[c].split('/');
+	$("#filesList ul").append('<li><a href="#" onclick="addTable(\'' + obj[c] + '\');return false;">' + parts[parts.length - 1] + '</li>');
+    }
+}
+
+function notShowAllExt(obj){
+
+    //console.log(obj);
+
+    // clear the existing list
+    $('#filesList ul li').remove();
+
+    for (var c = 0; c < obj.length; ++c) {
+	var parts = obj[c].split('/');
+	//console.log(parts);
+	for(var i=0; i<extentionList.length; i++){
+	    if(parts[parts.length - 1].endsWith(extentionList[i])){
+		$("#filesList ul").append('<li><a href="#" onclick="addTable(\'' + obj[c] + '\');return false;">' + parts[parts.length - 1] + '</li>');
+		break;
+	    }
+	}
+    }
+}
+
+</script>
+
+</html>

@@ -1,0 +1,7 @@
+{
+  "session": {
+    "durationInMinutes": 180,
+    "killAfterIdleMinutes": 30
+  },
+  "crewEmail":"philippe.salome@obspm.fr, levan.loria@obspm.fr, michel.caillat@obspm.fr"
+}

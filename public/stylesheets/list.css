@@ -1,0 +1,93 @@
+/*@import "compass/css3";*/
+
+div {
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+}
+
+table {
+    margin: 0;
+    padding: 0;
+}
+
+td {
+    margin: 0;
+    padding: 0;
+}
+
+tr {
+    margin: 0;
+    padding: 0;
+}
+
+h2 {
+    font: 400 40px/1.5 Helvetica, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+#objectsList ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    background-color: #0b97c4;
+}
+
+#objectsList ul li {
+    font: 200 15px/1.5 Helvetica, Verdana, sans-serif;
+    border-bottom: 1px solid #ccc;
+    text-align: center;
+}
+
+#objectsList ul li:last-child {
+    border: none;
+}
+
+#objectsList ul li a {
+    text-decoration: none;
+    color: #000;
+
+    -webkit-transition: font-size 0.3s ease, background-color 0.3s ease;
+    -moz-transition: font-size 0.3s ease, background-color 0.3s ease;
+    -o-transition: font-size 0.3s ease, background-color 0.3s ease;
+    -ms-transition: font-size 0.3s ease, background-color 0.3s ease;
+    transition: font-size 0.3s ease, background-color 0.3s ease;
+    display: block;
+}
+
+#objectsList ul li a:hover {
+    /*font-size: 15px;*/
+    background: #f6f6f6;
+}
+
+.scrollWrapper {
+    overflow: auto;
+    max-height: 100%;
+    padding-right: 100px;
+    margin-right: -100px;
+}
+
+#filterObjects {
+    background-image: url("imgs/search.png"); /* Add a search icon to input */
+    background-position: 1px 1px; /* Position the search icon */
+    background-repeat: no-repeat; /* Do not repeat the icon image */
+    background-size: 19px;
+    width: 120px; /* Full-width */
+    font-size: 15px; /* Increase font-size */
+    /*padding: 12px 20px 12px 40px; /* Add some padding */
+    padding-left: 22px;
+    padding-bottom: 2px;
+    border: 1px solid #ddd; /* Add a grey border */
+    margin-bottom: 2px; /* Add some space below the input */
+    position: fixed;
+}
+
+#objects {
+    margin-top: 23px;
+}

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+
+<title> <%= title %> </title>
+
+<head>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<!-- Adding Google Analytics to monitor site views. -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+          m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-65904265-3', 'auto');
+  ga('send', 'pageview');
+
+</script>
+<body>
+
+<div class="showcase__section" id="bubble">
+  <div class="spacer --small"></div>
+  <div id="bubbleplots">
+    <div class="bubbleplot" data-num="0">
+      <div class="plot" id="plotdiv"></div>
+      <div class="control-row">
+        Band: <select class="band">
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  <!-- JAVASCRIPT CODE GOES HERE -->
+
+  var d3 = Plotly.d3;
+
+  var WIDTH_IN_PERCENT_OF_PARENT = 100, HEIGHT_IN_PERCENT_OF_PARENT = 90;
+
+  var gd3 = d3.select('#plotdiv')
+          .style({
+            width: WIDTH_IN_PERCENT_OF_PARENT + '%',
+            'margin-left': (100 - WIDTH_IN_PERCENT_OF_PARENT) / 2 + '%',
+
+            height: HEIGHT_IN_PERCENT_OF_PARENT + 'vh',
+            'margin-top': (100 - HEIGHT_IN_PERCENT_OF_PARENT) / 2 + 'vh'
+          });
+
+  var gd = gd3.node();
+  var data, layout;
+
+  window.onresize = function() {
+    updateBands()
+  };
+
+  var myPlot = document.getElementById('plotdiv');
+  var calibratorsData = <%- JSON.stringify(calibrators) %>;
+  var calibratorsSize = <%- JSON.stringify(calibratorsSize) %>;
+  var poiCoord = <%- JSON.stringify(pois) %>;
+  var galaxyCoord = <%- JSON.stringify(galaxy) %>;
+
+  var calibsNum = calibratorsData["almaName"].length;
+
+
+/*********************************************************************/
+
+//  var conditions = ["z > 0", "0 < z && z < 0.5", "0.5 < z && z < 0.7", "0.7 < z && z < 1", "1 < z && z < 2", "2 < z && z < 3", "3 < z && z < 4", "z > 4"];
+/*  var conditions = {
+          label: ["All",   3,        4,        6,        7,        8,         9,        10],
+          eval:  ["z > 0", "z == 3", "z == 4", "z == 6", "z == 7", "z == 8",  "z == 9", "z == 10"]
+  };
+  */
+  var conditions = {
+    "All": "z > 0",
+    3:     "z == 3",
+    4: "z == 4",
+    6: "z == 6",
+    7:  "z == 7",
+    8:  "z == 8",
+    9: "z == 9",
+    10: "z == 10"
+  };
+
+  var noema = {
+    x: [0,  24,  24, 24],
+    y: [90, 90, -30, -30],
+    fill: 'tonextx',
+    fillcolor: 'rgba(0, 255, 0, 0.3)',
+    type: 'scatter',
+    mode: 'none',
+    name: 'NOEMA'
+  };
+
+  var pois = {
+    x: poiCoord['x'],
+    y: poiCoord['y'],
+    mode: 'text',
+    name: 'PoIs',
+    text: poiCoord['name'],
+    textposition: 'top right',
+    textfont: {
+      size: 16,
+      color: 'red'
+    },
+    type: 'scatter',
+    hoverinfo: 'none'
+  };
+
+  var galaxyPlane = {
+    x: galaxyCoord['x'],
+    y: galaxyCoord['y'],
+    marker: {
+      color: 'red',
+      width: 1
+    },
+    mode: 'lines',
+    type: 'scatter',
+    name: 'Galactic Plane',
+    hoverinfo: 'none'
+  };
+
+
+
+  var chosenCalibratorsData = {};
+  var chosenCalibratorsSize = [];
+  var chosenCalibsNum = 0;
+
+  for (var prop in calibratorsData) {
+    chosenCalibratorsData[prop] = [];
+  }
+
+  function getCalibratorsData(chosenCondition) {
+    // Remove prevoiusly added calibrators
+    for (var prop in calibratorsData) {
+      chosenCalibratorsData[prop] = [];
+    }
+    
+    chosenCalibratorsSize = [];
+    
+    // Add calibrators meeting a condition
+    for (var i = 0 ; i < calibsNum ; i++){
+      var z = calibratorsData["band"][i];
+      if (eval(conditions[chosenCondition])) {
+        for (var prop in calibratorsData) {
+          chosenCalibratorsData[prop].push(calibratorsData[prop][i]);
+        }
+        chosenCalibratorsSize.push(calibratorsSize[i]);
+      }
+    }
+  };
+
+  // Default Country Data
+  setBubblePlot("All");
+
+  function setBubblePlot(chosenCondition) {
+
+    getCalibratorsData(chosenCondition);
+
+    var colors = Array.apply(null, Array(calibsNum)).map(function () {
+      return 'rgba(0, 0, 255, 0.3)';
+    });
+
+    var calibrators = {
+      x:         chosenCalibratorsData["raCal"],
+      y:         chosenCalibratorsData["decCal"],
+      mode:      'markers',
+      type:      'scatter',
+      name:      'Calibrator',
+      text:      chosenCalibratorsData["almaName"],
+      hoverinfo: "x+y+text",
+      marker:    {
+        size:  chosenCalibratorsSize,
+        color: colors,
+        line:  {
+          color: 'rgba(0, 0, 0, 0.5)'
+        }
+      }
+    };
+
+    data = [noema, calibrators, pois, galaxyPlane];
+
+    layout = {
+      xaxis:     {
+        range: [0, 24],
+        title: 'Right Ascention [hours]'
+      },
+      yaxis:     {
+        range: [-90, 90],
+        title: 'Declination [Deg]'
+      },
+      title:     'Distribution of ALMA calibrators (2010-2016)',
+      hovermode: 'closest'
+    };
+
+    Plotly.newPlot(gd, data, layout);
+
+    var projectsClicked = {};
+
+    for (var prop of Array.from(new Set(calibratorsData.project))) {
+      projectsClicked[prop] = 0;
+    }
+
+    myPlot.on('plotly_click',
+            function (data) {
+
+              var point = data.points[0];
+              var textStr = "";
+
+              // Text to show when object is clicked
+              for (var prop in chosenCalibratorsData) {
+                textStr += "<i>" + prop + "</i>:   ";
+                if (prop === "freqSupport")
+                  textStr += "<a href='/calibratorFD?calibrator=" + encodeURI(chosenCalibratorsData["almaName"][point.pointNumber].replace("+", ";709;")) + "'> Show plot </a>";
+                else
+                  textStr += "<b>" + chosenCalibratorsData[prop][point.pointNumber] + "</b>";
+                textStr += "<br>";
+              }
+
+              ++projectsClicked[chosenCalibratorsData["project"][point.pointNumber]];
+
+              // Set to black colors of objects within the same project
+              for (var i = 0; i < chosenCalibsNum; ++i) {
+                for (var j in chosenCalibratorsData["project"][point.pointNumber]) {
+                  if (chosenCalibratorsData["project"][i].indexOf(chosenCalibratorsData["project"][point.pointNumber][j])) {
+                    colors[i] = 'red';
+                  }
+                }
+              }
+
+              var update = {
+                'marker.color': [colors]
+              };
+
+              Plotly.restyle('plotdiv', update, [1]);
+
+              var newAnnotation = {
+                    x:           point.xaxis.d2l(point.x),
+                    y:           point.yaxis.d2l(point.y),
+                    arrowhead:   6,
+                    arrowsize:   chosenCalibratorsSize[point.pointNumber] / 8,
+                    ax:          0,
+                    ay:          -160 - chosenCalibratorsSize[point.pointNumber],
+                    bgcolor:     'rgba(255, 255, 255, 0.9)',
+                    opacity:     0.7,
+                    font:        {size: 12},
+                    bordercolor: 'black',
+                    arrowcolor:  'red',
+                    text:        textStr,
+                    align:       "left"
+                  },
+                  divid         = document.getElementById('plotdiv'),
+                  newIndex      = (divid.layout.annotations || []).length;
+
+              // delete instead if clicked twice
+              if (newIndex) {
+                var foundCopy = false;
+                divid.layout.annotations.forEach(function (ann, sameIndex) {
+                  if (ann.text === newAnnotation.text) {
+
+                    // -=2 because previous ++ executes on every click.
+                    projectsClicked[chosenCalibratorsData["project"][point.pointNumber]] -= 2;
+
+                    for (var i = 0; i < chosenCalibsNum; ++i) {
+                      if (chosenCalibratorsData["project"][i] === chosenCalibratorsData["project"][point.pointNumber]) {
+                        if (projectsClicked[chosenCalibratorsData["project"][i]] < 1) {
+                          colors[i] = 'rgba(0, 0, 255, 0.3)';
+                        }
+                      }
+                    }
+                    var update = {
+                      'marker.color': [colors]
+                    };
+                    Plotly.restyle('plotdiv', update, [1]);
+                    Plotly.relayout('plotdiv', 'annotations[' + sameIndex + ']', 'remove');
+                    foundCopy = true;
+                  }
+                });
+                if (foundCopy) return;
+              }
+              Plotly.relayout('plotdiv', 'annotations[' + newIndex + ']', newAnnotation);
+            })
+            .on('plotly_clickannotation', function (event, data) {
+              Plotly.relayout('plotdiv', 'annotations[' + data.index + ']', 'remove');
+            });
+  };
+
+  var innerContainer = document.querySelector('[data-num="0"'),
+          plotEl = innerContainer.querySelector('.plot'),
+          calibratorSelector = innerContainer.querySelector('.band');
+
+  function assignOptions(textArray, selector) {
+    for (var i = 0; i < textArray.length;  i++) {
+      var currentOption = document.createElement('option');
+      currentOption.text = textArray[i];
+      selector.appendChild(currentOption);
+    }
+  }
+
+  var bandLabels = Object.keys(conditions);
+  bandLabels.splice(0, 0, "All");
+  bandLabels.splice(-1, 1);
+
+  assignOptions(bandLabels, calibratorSelector);
+
+  function updateBands(){
+    setBubblePlot(calibratorSelector.value);
+  }
+
+  calibratorSelector.addEventListener('change', updateBands, false);
+
+  /*********************************************************************/
+
+</script>
+</body>
+
+</html>

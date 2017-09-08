@@ -1,0 +1,50 @@
+<html>
+<head>
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+  <!-- Optional theme -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+  <!-- Latest compiled and minified JavaScript -->
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+  <style>
+  body {margin-left: 15px;}
+    .form-control { width: 15%; }
+  </style>
+
+  <title>
+    Register to Artemix
+  </title>
+</head>
+<body>
+  <h1>Register to Artemix</h1>
+
+  <div class="text-danger">
+    <h3><%= message %></h3>
+  </div>
+
+  <form action='/register', method='POST'>
+    <div class='form-group'>
+      <label for='inputEmail'> Email adress</label>
+      <input type='text', class='form-control', id='inputEmail', name='email', placeholder='Email', required, autofocus >
+    </div>
+    <div class='form-group'>
+      <label for='inputPassword'>Password</label>
+      <input type='password', class='form-control', id='inputPassword', name='password', placeholder='Password', required />
+    </div>
+    <div class='form-group'>
+      <label for='inputPasswordConfirmation'>Password confirmation</label>
+      <input type='password', class='form-control', id='inputPasswordConfirmation', name='passwordConfirmation', placeholder='Password confirmation', required />
+    </div>
+    <div class='form-group'>
+      <label for='inputInstitution'>Institution</label>
+      <input type='text', class='form-control', id='inputInstitution', name='institution', placeholder='Company/Institution', required />
+    </div>
+    <button type='submit', class='btn btn-default'/>Submit</button>
+  </form>
+  Give up ? <a href='/'> back to the public area </a>
+  <br/>
+</body>
+</html>

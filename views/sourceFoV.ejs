@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html>
+
+<title> <%= title %> </title>
+
+<head>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <!--script src="/javascripts/dhtmlxgrid.js"></script-->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>
+  <script src="/javascripts/bootstrap.min.js"></script>
+  <script type='text/javascript' src='http://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js' charset='utf-8'></script>
+
+
+
+  <link rel="stylesheet" type="text/css" href="/stylesheets/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="/stylesheets/sourceFoV.css">
+  <link rel='stylesheet' href='http://aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css' />
+
+
+</head>
+<!-- Adding Google Analytics to monitor site views. -->
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'UA-65904265-3', 'auto');
+    ga('send', 'pageview');
+
+</script>
+
+
+
+
+<body>
+
+<header>
+    <% include ./partials/header p%>
+</header>
+
+<!-- Modal -->
+<div class="modal fade" id="infoModal" role="dialog">
+  <div class="modal-dialog modal-lg">
+
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header" id="modalHeaderId">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title"></h4>
+      </div>
+      <div class="modal-body" id="infoModalBodyId">
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default " data-dismiss="modal" id="modal-close">Close</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="infoModalMetadata" role="dialog">
+  <div class="modal-dialog modal-md">
+
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header" id="modalHeaderIdMetadata">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title"></h4>
+      </div>
+      <div class="modal-body" id="infoModalBodyIdMetadata">
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default " data-dismiss="modal">Close</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<div id="bubbleplots">
+    <div class="bubbleplot" >
+
+    <!-- <div id="container-Freq-text"> -->
+    <div class="plot"  id="plotFreq"></div>
+    <br id="redshift-div">
+      <input type="text" name="Redshift" id="redshift" placeholder="Redshift"
+             oninput="redshiftChanged();" pattern="[0-9]{1,}.{0,1}[0-9]{0,}">
+      <input type="text" name="Velocity" id="velocity" placeholder="Velocity (km/s)"
+             oninput="velocityChanged();" pattern="[0-9]{1,}.{0,1}[0-9]{0,}">
+      <button type="button" class="btn btn-primary btn-sm allinfo-button">All Info</button>
+      </br>
+      <input type="checkbox" name="showAll" id="showAll_id" value="{showAll}">
+      Show all data. Initially shown are the data of which the flename ends with ".pbcor.fits", ".pbcorr.fits", ".image.fits", "line.fits", "cont.fits" or "clean.fits"
+    </div>
+    <!-- </div> -->
+    <div class="container">
+      <div class="div1">
+        <div class="table-responsive" id="sourceInfo">
+          <table class="table table-bordered" id="fitsTableInfo">
+          </table>
+        </div>
+      </div>
+      <div class="div2"><div id='aladin-lite-div' style='width: 100%;height:39em;'></div></div>
+    </div>
+  </div>
+</div>
+<script>
+    <!-- JAVASCRIPT CODE GOES HERE -->
+
+/*
+** Coordinate tabulators
+**
+**  - crval : value at reference point
+**  - cdelt : increment of abscissa
+**  - crpix : coordinate of reference point
+**  - n : tabulate at point of coordinate n
+*/
+var linearTabulator = function(crval, cdelt, crpix, n) {
+    return crval + (n - crpix) * cdelt;
+}
+
+let speedOfLight = 299792458.0;  // In m/s
+/*
+
+** Frequency <-> Velocity derivations.
+**
+** From https://www.iram.fr/IRAMFR/ARN/may95/node4.html
+*/
+
+/*
+** No verification is done on the values of restfreq and frequency. Both are expected to have realistic values.
+** frequency and restfreq are expected to by in the same unit (i.e. both in HZ or both in GHZ)
+** The result is in m/s.
+*/
+var f2v = function(frequency, restfreq) {
+    return speedOfLight * (restfreq - frequency) / frequency;
+}
+
+
+/*
+** No verification is done on the values of restfreq and velocity. Both are expected to have realistic values.
+*/
+var v2f = function(velocity, restfreq) {
+    return restfreq * ( 1.0 - velocity / speedOfLight );
+}
+
+let unitFactor = {"M/S": 1.0, "KM/S": 1000., "HZ": 1.0, "MHZ": 1000000., "GHZ" : 1.e+9};
+let defaultOutputUnit = {"FREQ" : "GHZ", "VRAD" : "KM/S", "VOPT" : "KM/S", "STOKES" : "_"};
+
+
+var d3 = Plotly.d3;
+
+var WIDTH_IN_PERCENT_OF_PARENT = 100, HEIGHT_IN_PERCENT_OF_PARENT = 39;
+var textInputHeight = 3;
+
+var gd3Freq = d3.select('#plotFreq')
+    .style({
+        //position: 'fixed',
+        width: WIDTH_IN_PERCENT_OF_PARENT + '%',
+        height: HEIGHT_IN_PERCENT_OF_PARENT - textInputHeight + 'vh',
+        display: 'inline-block'
+    });
+/*
+  var gd3Freq = d3.select('#plotFreq')
+  .style({
+  width: 100 + '%',
+  height: 40  /*HEIGHT_IN_PERCENT_OF_PARENT - textInputHeight - 1 + 'vh'
+  //          display: "block"
+  });
+*/
+var gd3Redshift = d3.select('#redshift')
+    .style({
+        //      width: WIDTH_IN_PERCENT_OF_PARENT + '%',
+        //height: textInputHeight + 'vh',
+        width: 10 + '%',
+        display: 'inline-block',
+        'margin-top': '-3vh'
+        // 'margin-left':WIDTH_IN_PERCENT_OF_PARENT + 0.5 + '%',
+        //  display: "block"
+    });
+
+var gd3Info = d3.select('#sourceInfo')
+    .style({
+        width: 100 + '%',
+        height: 100 - HEIGHT_IN_PERCENT_OF_PARENT - 2 - textInputHeight + 'vh'
+    });
+
+
+
+
+
+var gdFreq = gd3Freq.node();
+var gdInfo = gd3Info.node();
+var data = [];
+var dataStatic = [];
+var layout;
+
+var fitsData = [];
+
+window.onresize = function() {
+    setBarPlot();
+};
+
+
+
+//var myPlot = document.getElementById('plotFoV');
+var reqType = <%- JSON.stringify(reqType) %>;
+var sourcesData = <%- JSON.stringify(sources) %>;
+//var sourcesFD = <%- JSON.stringify(sourcesFD) %>;
+var sourceFD = <%- JSON.stringify(data) %>;
+var projCode = sourcesData["Project code"][sourceFD[0]][0];
+var catalogRa = <%- JSON.stringify(RA) %>;
+var catalogDec =  <%- JSON.stringify(DEC) %>;
+var freqsList = <%- JSON.stringify(freqsList) %>;
+//var foVs = <%- JSON.stringify(foVs) %>;
+var foVs = []
+
+var freqsListVA = freqsList["value"].slice(); // Array of values
+var sourceName = <%- JSON.stringify(Simbad).toUpperCase() %>;
+
+var targetNameSet = new Set();
+var projectCodeSet = new Set();
+var headersList;
+for(var i in sourceFD){
+    targetNameSet.add(sourcesData["Source name"][sourceFD[i]]);
+    projectCodeSet.add(sourcesData["Project code"][sourceFD[i]].toString());
+}
+
+var targetNameArray = [];
+targetNameSet.forEach(function(item, sameItem, s){targetNameArray.push(item)});
+
+
+var fitsTable;
+var tBody;
+var tBodyAllData;
+var tHead;
+
+var aladin;
+var overlay = A.graphicOverlay({color: '#0f0', lineWidth: 3});
+
+
+var RA  = catalogRa.toString();
+var DEC = catalogDec.toString();
+var myTarget = RA+" "+DEC;
+//var simbadLink = "http://simbad.u-strasbg.fr/simbad/sim-coo?Coord=" + RA +"+" + DEC + "";
+//var nedLink = "https://ned.ipac.caltech.edu/cgi-bin/objsearch?search_type=Near+Position+Search&in_csys=Equatorial&in_equinox=J2000.0&lon="+RA+"d&lat="+DEC+"d&radius=2.0&hconst=73&omegam=0.27&omegav=0.73&corr_z=1&z_constraint=Unconstrained&z_value1=&z_value2=&z_unit=z&ot_include=ANY&nmp_op=ANY&out_csys=Equatorial&out_equinox=J2000.0&obj_sort=Distance+to+search+center&of=pre_text&zv_breaker=30000.0&list_limit=5&img_stamp=YES";
+
+//console.log(myTarget);
+aladin = A.aladin('#aladin-lite-div', {fov:1, target: myTarget, zoom:0.2});
+var cat = A.catalogFromNED(myTarget, 0.01, {onClick: 'showTable', name: 'Some markers', sourceSize: 38, limit:1});
+aladin.addCatalog(cat);
+aladin.addOverlay(overlay);
+
+var extentionList = [".pbcor.fits", ".pbcorr.fits", ".image.fits", "line.fits", "cont.fits", "clean.fits"];
+
+
+$.post("/sourceFoV",{"method":"getHeaders", "data": targetNameArray, "reqType" : reqType, "projCode" : projCode}).done(function(resp) {
+
+    headersList = resp.data;
+
+    initFitsTable();
+
+
+    for(var i=0;i<headersList.length;i++){
+        var rowID = i;
+
+
+        var OBSRA = headersList[rowID].Header.OBSRA;
+        var OBSDEC = headersList[rowID].Header.OBSDEC;
+
+        var x1 = headersList[rowID].Header.CRVAL1 - headersList[rowID].Header.CRPIX1
+            * headersList[rowID].Header.CDELT1;
+        var x2 = headersList[rowID].Header.CRVAL1 + (headersList[rowID].Header.NAXIS1 - headersList[rowID].Header.CRPIX1)
+            * headersList[rowID].Header.CDELT1;
+        var y1 = headersList[rowID].Header.CRVAL2 - headersList[rowID].Header.CRPIX2
+            * headersList[rowID].Header.CDELT2;
+        var y2 = headersList[rowID].Header.CRVAL2 + (headersList[rowID].Header.NAXIS2 - headersList[rowID].Header.CRPIX2)
+            * headersList[rowID].Header.CDELT2;
+        var xmin = Math.min(x1,x2);
+        var xmax = Math.max(x1,x2);
+        var ymin = Math.min(y1,y2);
+        var ymax = Math.max(y1,y2);
+        var RA  = OBSRA.toString();
+        var DEC = OBSDEC.toString();
+        var myTarget = RA + " " + DEC;
+        var myFOV = (Math.max(headersList[rowID].Header.NAXIS1, headersList[rowID].Header.NAXIS2)
+                     * Math.max(headersList[rowID].Header.CDELT1, headersList[rowID].Header.CDELT2))*2
+
+
+
+        var footprint = [A.polygon([[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]])];
+        overlay.addFootprints(footprint);
+        overlay.overlays[rowID].isShowing = false;
+
+    }
+
+    buildFitsTable();
+
+});
+
+
+function initFitsTable(){
+    //var colNames = ["Target","RA","DEC","Cube size","Freq. range","Fits file"];
+
+    fitsTable = $('#fitsTableInfo');
+    tBody = $('<tbody></tbody>');
+    tBody.attr('id', "fitsBodyId");
+
+    tBodyAllData = $('<tbody></tbody>');
+    tBodyAllData.attr('id', "fitsBodyId");
+
+    tHead = $('<thead></thead>');
+    var tHeadContent =
+        '<tr>' +
+        '<th id="numHeaderId">#</th>' +
+        '<th>Fits file</th>' +
+        '<th id="targetHeaderId">Target</th>' +
+        '<th id="raHeaderId">RA</th>' +
+        '<th id="decHeaderId">DEC</th>' +
+        '<th id="dimHeaderId">Cube size</th>' +
+        '<th id="freqHeaderId">Freq. range</th>' +
+        '<th id="fnHeaderProjCode">Proj. code</th>' +
+        '<th id="fnHeaderUid">uid</th>'
+    '</tr>';
+
+    tHead.append(tHeadContent);
+
+    fitsTable.append(tHead);
+
+}
+
+function buildFitsTable(){
+
+
+    var rowNumber = 0;
+    var rowNumberAllData = 0;
+    for(var i=0; i<headersList.length;i++) {
+
+        var checkExt = false;
+
+        for (var j = 0; j < extentionList.length; j++) {
+            if (headersList[i].Path.endsWith(extentionList[j])) {
+                checkExt = true;
+                break;
+            }
+        }
+
+        if (!checkExt) {
+            rowNumberAllData++;;
+        }else{
+            rowNumberAllData++;;
+            rowNumber++;
+        }
+
+        var freq_min;
+        var freq_max;
+	let header = headersList[i].Header;
+	let naxis3 = header["NAXIS3"];
+	let ctype3 = header["CTYPE3"].toUpperCase();
+	let crpix3 = header["CRPIX3"];
+	let crval3 = header["CRVAL3"];
+	let cdelt3 = header["CDELT3"];
+	let cunit3 = header["CUNIT3"].toUpperCase();
+	let restfreq = header["RESTFRQ"];
+	let specsys = header["SPECSYS"];
+
+        if (headersList[i].Header.CTYPE3 === 'VRAD') {
+	    let vel_min = linearTabulator(crval3, cdelt3, crpix3, 1);
+	    freq_max = v2f(vel_min, restfreq)* unitFactor[cunit3]/unitFactor[defaultOutputUnit['FREQ']];
+            //freq_min = round((headersList[i].Header.CRPIX3 + 1) * headersList[i].Header.CDELT3 * headersList[i].Header.RESTFRQ / 3e+8 / 1e+9 + headersList[i].Header.RESTFRQ / 1e+9, 4);
+
+	    let vel_max = linearTabulator(crval3, cdelt3, crpix3, naxis3);
+	    freq_min = v2f(vel_max, restfreq) * unitFactor[cunit3]/unitFactor[defaultOutputUnit['FREQ']];
+            // freq_max = round((headersList[i].Header.CRPIX3 - headersList[i].Header.NAXIS3 + 1) * headersList[i].Header.CDELT3 * headersList[i].Header.RESTFRQ / 3e+8 / 1e+9 + headersList[i].Header.RESTFRQ / 1e+9, 4);
+        } else {
+            if (headersList[i].Header.NAXIS3 > 1) {
+                freq_max = round(((headersList[i].Header.CRPIX3 - 1) * (headersList[i].Header.CDELT3 / 1e+6) + headersList[i].Header.CRVAL3 / 1e+6) / 1000, 4);
+                freq_min = round(((headersList[i].Header.CRPIX3 + headersList[i].Header.NAXIS3 - 1) * (headersList[i].Header.CDELT3 / 1e+6) + headersList[i].Header.CRVAL3 / 1e+6) / 1000, 4);
+            } else {
+                //freq_min = round(((headersList[i].Header.CRPIX3 - 1) * (headersList[i].Header.CDELT3 / 1e+6) + headersList[i].Header.CRVAL3 / 1e+6) / 1000, 4);
+                freq_min = round(( (-headersList[i].Header.CDELT3 / 1e+6) / 2 + headersList[i].Header.CRVAL3 / 1e+6) / 1000, 4);
+                freq_max = round(( (headersList[i].Header.CDELT3 / 1e+6) / 2 + headersList[i].Header.CRVAL3 / 1e+6) / 1000, 4);
+            }
+        }
+
+
+        var row = $('<tr></tr>').addClass('clickable-row');
+        row.attr('id', i);
+
+        var rowAllData = $('<tr></tr>').addClass('clickable-row');
+        rowAllData.attr('id', i);
+
+
+        var indexCol = $('<td></td>');
+        var indexColContent = (rowNumber);
+        indexCol.append(indexColContent);
+
+        var indexColAllData = $('<td></td>');
+        var indexColAllDataContent = (rowNumberAllData);
+        indexColAllData.append(indexColAllDataContent);
+
+        //<a href=sourceFD?file=' + encodeURIComponent(path) + ' id="openFile">Open file</a>
+        //window.open('http://google.com','_blank')
+        //'<button type="button" class="btn btn-success btn-xs open-button" onclick="location.href=' + "'/sourceFD?file=" + encodeURIComponent(headersList[i].Path)  + "'" + '"' + '
+
+        var actionButtonColumn = $('<td></td>');
+        var actionButton = $('<div></div>').addClass('btn-group');
+        var actionButtonContent =
+            '<button type="button" class="btn btn-success btn-xs info-button">Info</button>' +
+            '<button type="button" class="btn btn-success dropdown-toggle btn-xs" data-toggle="dropdown">' +
+            '<span class="caret"></span>' +
+            '<span class="sr-only">Toggle Dropdown</span>' +
+            '</button>' +
+            '<ul class="dropdown-menu" role="menu">' +
+            '<li><a href="/sourceFD?file=' + encodeURIComponent(headersList[i].Path) + '"' + ' target="_blank"' + '>Open</a></li>' +
+            '<li><a href="#" onclick="buttonClickedSelectAll()">Select all</a></li>' +
+            '<li><a href="#" onclick="buttonClickedUnSelectAll()">Unselect All</a></li>' +
+            '</ul>';
+
+        //'<li class="divider"></li>' +
+        //'<li><a href="#">More</a></li>' +
+
+
+        /* ----------------------------- RA ----------------------------- */
+
+        actionButton.append(actionButtonContent);
+        actionButtonColumn.append(actionButton);
+
+
+        var obsra = headersList[i].Header.OBSRA,
+        obsdec = headersList[i].Header.OBSDEC;
+
+        var obsra_h = obsra/15;
+        var obsra_hh = parseInt(obsra_h);
+
+        var obsra_m = (obsra_h - obsra_hh) * 60;
+        var obsra_mm = parseInt(obsra_m);
+
+        var obsra_s = (obsra_m - obsra_mm) * 60;
+        var obsra_ss = round(obsra_s,2);
+        obsra_ss = obsra_ss.toFixed(2);
+
+        if(obsra_hh < 10){
+            obsra_hh = '0' + obsra_hh;
+        }
+
+        if(obsra_mm < 10){
+            obsra_mm = '0' + obsra_mm;
+        }
+
+
+        /* ----------------------------- DEC ----------------------------- */
+
+
+        var obsdec_d = parseInt(obsdec);
+
+        var obsdec_m = (obsdec - obsdec_d) * 60;
+        var obsdec_mm = parseInt(obsdec_m);
+
+        var obsdec_s = round((obsdec_m - obsdec_mm) * 60,2);
+
+
+        if(obsdec < 0){
+            if(Math.abs(obsdec_d) < 10){
+                obsdec_d = '-0' + Math.abs(obsdec_d);
+            }
+        }else{
+            if(obsdec_d < 10){
+                obsdec_d = '0' + Math.abs(obsdec_d);
+            }
+        }
+
+        obsdec_mm = Math.abs(obsdec_mm);
+        if(obsdec_mm < 10){
+            obsdec_mm = '0' + obsdec_mm;
+        }
+
+        var uid;
+        if(headersList[i].Path.split('/')[4] == undefined){
+            uid = 'N/A';
+        }else{
+            if(headersList[i].Path.split('/')[4].split('_').length != 6){
+                uid = 'N/A';
+            } else {
+                uid = 'uid://' + headersList[i].Path.split('/')[4].split('_')[headersList[i].Path.split('/')[4].split('_').length - 3] + '/' +headersList[i].Path.split('/')[4].split('_')[headersList[i].Path.split('/')[4].split('_').length - 2] + '/' + headersList[i].Path.split('/')[4].split('_')[headersList[i].Path.split('/')[4].split('_').length - 1];
+            }
+        }
+
+        var rowContent =
+            '<td>' + headersList[i].Header.OBJECT + '</td>' +
+            '<td>' + obsra_hh + ':' + obsra_mm + ':' + obsra_ss + '</td>' +
+            '<td>' + obsdec_d + ':' + obsdec_mm + ':' + Math.abs(obsdec_s).toFixed(2) + '</td>' +
+            '<td>' + headersList[i].Header.NAXIS1 + 'x' + headersList[i].Header.NAXIS2 +
+            'x' + headersList[i].Header.NAXIS3 + //'x ' + headersList[i].Header.NAXIS4 + '</td>' +
+            '<td id="freqId' + i + '"' + '>' + round(freq_min,3) + ' --- ' + round(freq_max,3) + '</td>' +
+            '<td>' +  headersList[i].Path.substring(1,15) + '</td>' +
+            '<td>' + uid + '</td>';
+
+
+
+
+        if(headersList[i].Header.NAXIS3 > 1){  //3D
+            row.addClass('tr_3d');
+            rowAllData.addClass('tr_3d');
+        }else{ //2D
+            row.addClass('tr_2d');
+            rowAllData.addClass('tr_2d');
+        }
+
+
+        if(checkExt){
+            row.append(indexCol);
+            row.append(actionButtonColumn);
+            row.append(rowContent);
+
+            tBody.append(row);
+
+        }
+
+        var actionAllDataButtonColumn = actionButtonColumn.clone();
+
+        rowAllData.append(indexColAllData);
+        rowAllData.append(actionAllDataButtonColumn);
+        rowAllData.append(rowContent);
+
+
+
+        tBodyAllData.append(rowAllData);
+
+
+
+    }
+
+
+    fitsTable.append(tBody);
+    fitsTable.append(tBodyAllData);
+
+
+    $('#fitsTableInfo').on('click', '.clickable-row', function(event) {
+
+        if(event.target.nodeName === "A") return;
+
+
+        var checked = $('#showAll_id').is(":checked");
+
+        if(event.target.classList[0] !== "btn" && event.target.classList[0] != "caret"){
+
+            var rowID = $(this).closest('tr').attr('id');
+            var freqs = $('#' + 'freqId' + rowID).text().split(" --- ");
+
+            var f_min,f_max;
+            f_min = freqs[0];
+            f_max = freqs[1];
+
+            if($(this).hasClass('active')){
+                $(this).removeClass('active');
+
+
+
+                if(checked){
+                    tBody.children('tr').each(function(){
+                        if($(this).attr('id') == rowID) {
+                            $(this).removeClass('active');
+                        }
+                    });
+
+                }else{
+                    tBodyAllData.children('tr').each(function(){
+                        if($(this).attr('id') == rowID) {
+                            $(this).removeClass('active');
+                        }
+                    });
+                }
+
+
+                overlay.overlays[rowID].isShowing = false;
+                updatePlotData(rowID,f_min,f_max);
+
+
+            } else {
+                $(this).addClass('active');
+
+
+                if(checked){
+                    tBody.children('tr').each(function(){
+                        if($(this).attr('id') == rowID) {
+                            $(this).addClass('active');
+                        }
+                    });
+                }else{
+                    tBodyAllData.children('tr').each(function(){
+                        if($(this).attr('id') == rowID) {
+                            $(this).addClass('active');
+                        }
+                    });
+                }
+                overlay.overlays[rowID].isShowing = true;
+
+                updatePlotData(rowID,f_min,f_max);
+
+
+            }
+
+
+
+
+
+
+        }
+
+
+
+    });
+
+    $(".allinfo-button").click(function(){
+        $("#infoModalMetadata").modal();
+
+        $('#modalHeaderIdMetadata').empty();
+
+        $('#infoModalBodyIdMetadata').empty();
+
+
+        var projectCodeArray = [];
+        projectCodeSet.forEach(function(item, sameItem, s){projectCodeArray.push(item)});
+
+        for(var i=0;i<projectCodeArray.length;i++){
+            $('#infoModalBodyIdMetadata').append($("<p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp</p>").text());
+            $('#infoModalBodyIdMetadata').append($("<p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp</p>").text());
+            $('#infoModalBodyIdMetadata').append($("<p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp</p>").text());
+            $('#infoModalBodyIdMetadata').append($("<p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp</p>").text());
+            $('#infoModalBodyIdMetadata').append($("<p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp</p>").text());
+            $('#infoModalBodyIdMetadata').append(projectCodeArray[i]).css('color', 'green');
+            $('#infoModalBodyIdMetadata').append($("<p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp</p>").text());
+            var link = "https://ui.adsabs.harvard.edu/#search/q=%3D%22" + projectCodeArray[i] + "%22%20OR%20%22" + projectCodeArray[i] + "V%22&sort=date%20desc%2C%20bibcode%20desc";
+            $('#infoModalBodyIdMetadata').append('<a href="' + link + '" target="_blank">ADS publications   </a>');
+            $('#infoModalBodyIdMetadata').append($("<p>&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp</p>").text());
+            var downloadLink = 'http://almascience.nrao.edu/aq/?project_code=' + projectCodeArray[i] + '&result_view=observation&science_observations=on#sortCol=Release%20date&sortDir=asc&col_1=_checkbox_selector;;;&col_2=Project%20code;;;&col_3=Member%20ous%20id;;;&col_4=PI%20name;;;&col_5=Source%20name;;;&col_6=RA;;;&col_7=Dec;;;&col_8=Band;;;&col_9=Integration;;;&col_10=Release%20date;;;&col_11=Velocity%20resolution;;;&col_12=Frequency%20support;;;&col_13=Pub;;;';
+            $('#infoModalBodyIdMetadata').append('<a href="' + downloadLink + '" target="_blank">ESO Archive</a></br>');
+        }
+
+    });
+
+    $(".info-button").click(function(){
+
+        $("#infoModal").modal();
+
+        $('#modalHeaderId').empty();
+        $('#modalHeaderId').append('<h3></h3>');
+
+        $('#infoModalBodyId').empty();
+        $('#infoModalBodyId').append('<p></p>');
+
+        var rowID = $(this).closest('tr').attr('id');
+
+
+        $('#modalHeaderId h3').append('Project code : ' + headersList[rowID].Path.substring(1,15));
+        //"ADS/JAO.ALMA#2011.0.00010.S"   OR "ADS/JAO.ALMA#2011.0.00010.SV"
+        //console.log(headersList[rowID].Path);
+        $('#infoModalBodyId p').append(headersList[rowID].Path + '</br>');
+        var link = "https://ui.adsabs.harvard.edu/#search/q=%3D%22" + headersList[rowID].Path.split("/")[1].substring(0, 14) + "%22%20OR%20%22" + headersList[rowID].Path.split("/")[1].substring(0, 14) + "V%22&sort=date%20desc%2C%20bibcode%20desc";
+        $('#infoModalBodyId p').append('<a href="' + link + '" target="_blank">ADS publications</a></br>');
+
+        var downloadLink = 'http://almascience.nrao.edu/aq/?project_code=' + headersList[rowID].Path.split("/")[1].substring(0, 14) + '&result_view=observation&science_observations=on#sortCol=Release%20date&sortDir=asc&col_1=_checkbox_selector;;;&col_2=Project%20code;;;&col_3=Member%20ous%20id;;;&col_4=PI%20name;;;&col_5=Source%20name;;;&col_6=RA;;;&col_7=Dec;;;&col_8=Band;;;&col_9=Integration;;;&col_10=Release%20date;;;&col_11=Velocity%20resolution;;;&col_12=Frequency%20support;;;&col_13=Pub;;;';
+        $('#infoModalBodyId p').append('<a href="' + downloadLink + '" target="_blank">ESO Archive</a></br>');
+
+    });
+
+    /*
+      $("#modal-close").click(function(){
+      $('#infoModalBodyId').empty();
+      });
+    */
+
+    $("#showAll_id").change(function() {
+        updateFitsTable();
+    });
+
+
+    $("#infoModal").on("hidden.bs.modal", function () {
+        $('#infoModalBodyId').empty();
+    });
+
+
+    tBodyAllData.detach();
+
+
+}
+
+
+
+function updateFitsTable(){
+
+
+    if($('#showAll_id').is(":checked")){
+        tBody.detach();
+        $('#fitsTableInfo').append(tBodyAllData);
+    }else{
+        tBodyAllData.detach();
+        $('#fitsTableInfo').append(tBody);
+    }
+
+
+}
+
+var fitsDataFreqSupDict = {};
+function updatePlotData(id,freq_min,freq_max){
+    if(!fitsDataFreqSupDict.hasOwnProperty(id)){
+        fitsDataFreqSupDict[id] = [freq_min,freq_max];
+    }else{
+        delete fitsDataFreqSupDict[id];
+    }
+
+
+
+    mergePlotFreqData2();
+    setBarPlot();
+    //Plotly.plot(gdFreq,data,layout);
+}
+
+
+var dataUpdate = [] ;
+function mergePlotFreqData2(){
+
+
+    data = dataStatic.slice();
+
+    for(var key in fitsDataFreqSupDict){
+
+
+        var band = {
+            x:         [fitsDataFreqSupDict[key][0], fitsDataFreqSupDict[key][1], fitsDataFreqSupDict[key][1], fitsDataFreqSupDict[key][0], fitsDataFreqSupDict[key][0]],
+            y:         [2, 2, 0, 0, 2],
+            fill:      'tozeroy',
+            fillcolor: 'rgba(255, 255, 0, 0.2)',
+            line: {
+                color: 'rgba(255, 255, 0, 0.2)',
+                width: 1
+            },
+            type:      'scatter',
+            mode:      'lines',
+            hoverinfo: 'none'
+        };
+
+        data.push(band);
+
+
+
+    }
+
+
+
+}
+
+
+
+function mergePlotFreqData(){
+
+
+    var f_min = parseFloat(fitsDataFreqSupDict[22][0]);
+    var f_max = parseFloat(fitsDataFreqSupDict[22][1]);
+
+    dataUpdate = [];
+    tickVals = [0];
+
+    var total = 0;
+    var start=0,end;
+    for (var i = 0; i < sourcesFD.length; i += 2){
+
+        start += sourcesFD[i];
+        end = start + sourcesFD[i+1];
+
+        if(f_min > start && f_max < end){
+
+            var x = start;
+            var y = f_min - start;
+            var trace2a,trace2b;
+
+            trace2a = {
+                x:  [0, x, 0],
+                orientation: "h",
+                hoverinfo: "none",
+                type: 'bar',
+                marker: {
+                    color: 'rgba(1, 1, 1, 0.0)'
+                }
+            };
+
+            dataUpdate.push(trace2a);
+
+
+            trace2b = {
+                x: [0, f_min - start,  0],
+                type: 'bar',
+                hoverinfo: "none",
+                text: tickText,
+                orientation: "h",
+                marker: {
+                    color: 'rgba(0, 255, 0, 0.7)',
+                    line: {
+                        color: 'rgba(0, 255, 0, 1.0)',
+                        width: 1
+                    }
+                }
+            };
+
+            dataUpdate.push(trace2b);
+
+            trace2b = {
+                x: [0, f_max - f_min,  0],
+                type: 'bar',
+                hoverinfo: "none",
+                text: tickText,
+                orientation: "h",
+                marker: {
+                    color: 'rgba(255,0, 0, 0.7)',
+                    line: {
+                        color: 'rgba(255,0, 0, 0.7)',
+                        width: 1
+                    }
+                }
+            };
+
+            dataUpdate.push(trace2b);
+
+            trace2b = {
+                x: [0, start + sourcesFD[i+1] - f_max,  0],
+                type: 'bar',
+                hoverinfo: "none",
+                text: tickText,
+                orientation: "h",
+                marker: {
+                    color: 'rgba(0,255, 0, 0.7)',
+                    line: {
+                        color: 'rgba(0,255, 0, 0.7)',
+                        width: 1
+                    }
+                }
+            };
+
+            dataUpdate.push(trace2b);
+
+
+            tickVals.push(start);
+            tickVals.push(f_min);
+            tickVals.push(f_max);
+            tickVals.push(start + sourcesFD[i+1]);
+
+            start += sourcesFD[i+1];
+
+        } //if(f_min >= start && f_max <= end)
+
+
+        data = dataUpdate;
+        for (var i in bands) {
+
+            var band = {
+                x:         [bands[i][0], bands[i][1], bands[i][1], bands[i][0], bands[i][0]],
+                y:         [2, 2, 0, 0, 2],
+                fill:      'tozeroy',
+                fillcolor: 'rgba(0, 0, 255, 0.2)',
+                line: {
+                    color: 'rgba(0, 0, 255, 0.5)',
+                    width: 1
+                },
+                type:      'scatter',
+                mode:      'lines',
+                hoverinfo: 'none'
+            };
+
+            data.push(band);
+        }
+
+    }
+
+
+}
+
+/*
+
+  dataUpdate = [];
+  for (i = 0; i < sourcesFD.length-2; i += 2) {
+
+  //tickVals.push(tickVals[tickVals.length-1] + sourcesFD[i]);
+  //tickVals.push(tickVals[tickVals.length-1] + sourcesFD[i+1]);
+
+  var trace2a = {
+  x:  [0, sourcesFD[i], 0],
+  orientation: "h",
+  hoverinfo: "none",
+  type: 'bar',
+  marker: {
+  color: 'rgba(1, 1, 1, 0.0)'
+  }
+  };
+
+  dataUpdate.push(trace2a);
+
+  var trace2b = {
+  x: [0, sourcesFD[i + 1],  0],
+  type: 'bar',
+  hoverinfo: "none",
+  text: tickText,
+  orientation: "h",
+  marker: {
+  color: 'rgba(255, 0, 0, 0.7)',
+  line: {
+  color: 'rgba(255, 0, 0, 1.0)',
+  width: 1
+  }
+  }
+  };
+
+  dataUpdate.push(trace2b);
+  }
+
+  }
+*/
+/*
+  if (sourceFD.hasOwnProperty("source")) {
+  sourceName = decodeURI(sourceFD.source.replace(";709;", "+"));
+  }
+  else
+  throw new Error("Source name not passed as parameter");
+*/
+
+var metaDataFreqSupsArray;
+var strAll = [];
+var sourcesNum = sourceFD.length;
+var dataFreq = [];
+{
+
+    var freqSup = "";
+    var freqSupsArray = [];
+    var foV = [];
+
+    for (i = 0; i < sourcesNum; ++i)
+        for (j = 0; j < sourcesData["Frequency support"][sourceFD[i]].length; ++j) { //    var str of sources["Frequency support"][i]) {
+            var str = sourcesData["Frequency support"][sourceFD[i]][j].split('U');
+            strAll = strAll.concat(str);
+
+
+        }
+
+    var totalAv = 0;
+
+    for (k = 0; k < strAll.length; ++k) { //  var s of str.split('U')) {
+        var s = strAll[k];
+        var start = parseFloat(s.split(',')[0].split('..')[0].trim().slice(1));
+        var end = parseFloat(s.split(',')[0].split('..')[1].trim().slice(0, -3));
+
+
+        totalAv += (start + end) / 2;
+
+
+        if (freqSup.indexOf(s) === -1) {
+            freqSupsArray.push([start, end]);
+        }
+    }
+    foV.push(totalAv / k);
+
+    //console.log(strAll);
+    foVs.push(foV);
+    freqSupsArray.sort(function(a, b){ return a[0] - b[0] });
+    metaDataFreqSupsArray = freqSupsArray;
+    var tmpArr = [freqSupsArray[0]];
+
+    for (j = 1, k = 0; j < freqSupsArray.length; ++j) {
+        if (tmpArr[k][1] < freqSupsArray[j][1]) {
+            if ((tmpArr[k][1] >= freqSupsArray[j][0]))
+                tmpArr[k][1] = freqSupsArray[j][1];
+            else {
+                tmpArr.push(freqSupsArray[j]);
+                ++k;
+            }
+        }
+    }
+
+    freqSupsArray = tmpArr.slice();
+    var numIter = freqSupsArray.length * 2 - data.length;
+
+    for (j = 0; j < numIter; ++j) {
+        dataFreq.push(Array.apply(null, Array(sourcesNum)).map(function() { return 0; }));
+    }
+
+    for (var j = 0, k = 0, base = 0; j < freqSupsArray.length; ++j, k += 2) {
+        start = freqSupsArray[j][0];
+        end = freqSupsArray[j][1];
+        var barLen = end - start;
+        dataFreq[k] = start - base;
+        base = end;
+        dataFreq[k+1] = barLen;
+    }
+}
+
+var sourcesFD = dataFreq;
+
+var freqSupsAll = [];
+var sourceIndex = [];
+sourceIndex = 0;
+var shapesNum = sourceFD.length;
+
+
+//var tickText = ["", "Frequency support", ""];
+var tickText = ["", "", ""];
+var tickVals = [0];
+
+for (i = 0; i < sourcesFD.length; i += 2) {
+
+    tickVals.push(tickVals[tickVals.length-1] + sourcesFD[i]);
+    tickVals.push(tickVals[tickVals.length-1] + sourcesFD[i+1]);
+
+    var trace2a = {
+        x:  [0, sourcesFD[i], 0],
+        orientation: "h",
+        hoverinfo: "none",
+        type: 'bar',
+        marker: {
+            color: 'rgba(1, 1, 1, 0.0)'
+        }
+    };
+
+    data.push(trace2a);
+
+    var trace2b = {
+        x: [0, sourcesFD[i + 1],  0],
+        type: 'bar',
+        hoverinfo: "none",
+        text: tickText,
+        orientation: "h",
+        marker: {
+            color: 'rgba(0, 255, 0, 0.7)',
+            line: {
+                color: 'rgba(0, 255, 0, 1.0)',
+                width: 1
+            }
+        }
+    };
+
+    data.push(trace2b);
+}
+
+// ALMA bands: 3,       4,          6,          7,          8,          9
+var bands = [[84, 116], [125, 163], [211, 275], [275, 373], [385, 500], [602, 720]];
+
+for (var i in bands) {
+
+    var band = {
+        x:         [bands[i][0], bands[i][1], bands[i][1], bands[i][0], bands[i][0]],
+        y:         [2, 2, 0, 0, 2],
+        fill:      'tozeroy',
+        fillcolor: 'rgba(0, 0, 255, 0.2)',
+        line: {
+            color: 'rgba(0, 0, 255, 0.5)',
+            width: 1
+        },
+        type:      'scatter',
+        mode:      'lines',
+        hoverinfo: 'none'
+    };
+
+    data.push(band);
+}
+
+dataStatic = data.slice();
+
+var bandsLabels =["Band 3", "Band 4", "Band 6", "Band 7", "Band 8", "Band 9"];
+
+var annotations = [];
+
+for (var i = 0 ; i < bands.length ; ++i) {
+    var x = (bands[i][0] + bands[i][1]) / 2;
+    var result = {
+        x: x,
+        y: 0.1,
+        text: bandsLabels[i],
+        font: {
+            family: 'Arial',
+            size: 20,
+            color: 'rgba(245, 0, 0, 0.3)'
+        },
+        showarrow: false
+    };
+    annotations.push(result);
+}
+
+var range = Array.apply(null, Array(3)).map(function (x, i) {
+    return i;
+});
+
+var lines = [];
+
+function computeLines() {
+
+    lines = [];
+
+    for (var i = 0; i < freqsList["value"].length; ++i) {
+        var line = {
+            x:         [freqsList["value"][i], freqsList["value"][i]],
+            y:         [0, 2],
+            text:      [freqsList["name"][i], freqsList["name"][i]],
+            hoverinfo: 'x+text',
+            line:      {
+                color: 'red',
+                width: 1
+            },
+            type:      'scatter',
+            mode:      'lines'
+        };
+
+        if(line.x[0] <= 720)
+            lines.push(line);
+    }
+}
+
+computeLines();
+
+function setBarPlot() {
+
+    layout = {
+	autosize: true,
+        xaxis:         {
+            ticks:    "inside",
+            mirror:   "ticks",
+            tickmode: 'array',
+            ticktext: tickVals,
+            tickvals: tickVals,
+            tickangle: 45,
+            showgrid: true,
+            showline: true,
+            range:    [tickVals[1]-20, tickVals[tickVals.length-1]+20],
+            title:    'Frequency [GHz]'
+        },
+        yaxis:         {
+            ticks:    "inside",
+            mirror:   "ticks",
+            tickmode: 'array',
+            ticktext: tickText,
+            tickvals: range,
+            tickangle: -90,
+            tickfont: { size: 20 },
+            showgrid: true,
+            showline: true,
+            range:    [0, 2],
+            //title:    'Source'
+        },
+        title:         'Distribution of ALMA frequencies for sources (2010-2016)',
+        barmode:       'stack',
+        paper_bgcolor: 'rgba(245,246,249,1)',
+        plot_bgcolor:  'rgba(245,246,249,1)',
+        showlegend:    false,
+        hovermode:     "compare",
+        annotations: annotations
+    };
+
+
+
+    /*
+      for (var i = 0; i < sourceFD.length; ++i){
+
+      var OBSRA = sourcesData["RA"][sourceFD[i]];
+      var OBSDEC = sourcesData["Dec"][sourceFD[i]];
+      var RA  = OBSRA.toString();
+      var DEC = OBSDEC.toString();
+      var myTarget = RA+" "+DEC;
+      var simbadLink = "http://simbad.u-strasbg.fr/simbad/sim-coo?Coord=" + RA +"+" + DEC + "";
+      var nedLink = "https://ned.ipac.caltech.edu/cgi-bin/objsearch?search_type=Near+Position+Search&in_csys=Equatorial&in_equinox=J2000.0&lon="+RA+"d&lat="+DEC+"d&radius=2.0&hconst=73&omegam=0.27&omegav=0.73&corr_z=1&z_constraint=Unconstrained&z_value1=&z_value2=&z_unit=z&ot_include=ANY&nmp_op=ANY&out_csys=Equatorial&out_equinox=J2000.0&obj_sort=Distance+to+search+center&of=pre_text&zv_breaker=30000.0&list_limit=5&img_stamp=YES";
+
+
+
+      cat.addSources([A.marker(sourcesData["RA"][sourceFD[i]], sourcesData["Dec"][sourceFD[i]],
+      {popupTitle: sourcesData["Source name"][sourceFD[i]], popupDesc: 'More info <br/><a target="_blank" href='+simbadLink+'>in Simbad</a><br/><a target="_blank" href='+nedLink+'>in NED</a>'})]);
+
+      }*/
+
+    aladin.view.catalogs.splice(0,1)
+    aladin.addCatalog(cat);
+    //cat.addSources(A.catalogFromSimbad(myTarget, 0.01, {onClick: 'showTable',name: 'Some markers', sourceSize: 38, shape: 'plus',limit:1}));
+    //cat.addSources(A.catalogFromNED(myTarget, 0.01, {onClick: 'showTable', name: 'Some markers', sourceSize: 25, limit:1}));
+
+
+
+    Plotly.newPlot(gdFreq, data, layout);
+
+    redshiftChanged();
+
+    velocityChanged();
+}
+
+setBarPlot();
+
+
+/* Check if the provided argument is numeric. */
+function isNumeric(n) {
+    return !isNaN(parseFloat(n)) && isFinite(n);
+}
+
+
+function checkRedshiftVelocity(){
+
+}
+
+
+/*
+ * Function to apply the redshift entered from keyboard.
+ * */
+function redshiftChanged() {
+    var redshift = document.getElementById('redshift').value;
+
+    if(redshift === ""){
+        Plotly.newPlot('plotFreq', data, layout);
+        return;
+    }
+
+    if(document.getElementById('velocity').value !== "")
+        document.getElementById('velocity').value = "";
+
+
+    if (isNumeric(redshift)) {
+        redshift = parseFloat(redshift);
+
+        for (var i = 0; i < freqsList["value"].length; ++i) {
+            freqsList["value"][i] = freqsListVA[i] / (1 + redshift);
+        }
+
+        computeLines();
+        Plotly.newPlot('plotFreq', data.concat(lines), layout);
+    }
+    else {
+        Plotly.newPlot('plotFreq', data, layout);
+    }
+}
+
+
+function velocityChanged(){
+    var velocity  = document.getElementById('velocity').value;
+
+    if(velocity === ""){
+        if(document.getElementById('redshift').value !== ""){
+	    return;
+ 	}
+	Plotly.newPlot('plotFreq', data, layout);
+        return;
+    }
+
+    if(document.getElementById('redshift').value !== "")
+        document.getElementById('redshift').value = "";
+
+
+    var lightSpeed = 299792.458;
+
+    if (isNumeric(velocity)) {
+        velocity = parseFloat(velocity);
+
+        for (var i = 0; i < freqsList["value"].length; ++i) {
+            freqsList["value"][i] = freqsListVA[i] / (1 + velocity/lightSpeed);
+        }
+
+        computeLines();
+        Plotly.newPlot('plotFreq', data.concat(lines), layout);
+    }
+    else {
+        Plotly.newPlot('plotFreq', data, layout);
+    }
+}
+
+/*
+** Round *original* number to *round* numbers after 0.
+*/
+function round(original, round) {
+    var i = 0;
+    var r = 1;
+    while(i < round) {
+        ++i;
+        r *= 10;
+    }
+    return Math.round(original * r) / r;
+}
+
+
+function buttonClickedSelectAll(){
+    tBody.children('tr').each(function(){
+        $(this).addClass('active');
+    });
+
+    tBodyAllData.children('tr').each(function(){
+        $(this).addClass('active');
+    });
+
+
+    for(var i=0;i<headersList.length;i++){
+        overlay.overlays[i].isShowing = true;
+
+        var freqs = $('#' + 'freqId' + i).text().split(" --- ");
+
+        var f_min,f_max;
+        f_min = freqs[0];
+        f_max = freqs[1];
+
+        fitsDataFreqSupDict[i] = [f_min,f_max];
+    }
+
+
+    mergePlotFreqData2();
+    setBarPlot();
+
+}
+
+function buttonClickedUnSelectAll(){
+    tBody.children('tr').each(function(){
+        $(this).removeClass('active');
+    });
+
+    tBodyAllData.children('tr').each(function(){
+        $(this).removeClass('active');
+    });
+
+
+    for(var i=0;i<headersList.length;i++){
+        overlay.overlays[i].isShowing = false;
+
+        var freqs = $('#' + 'freqId' + i).text().split(" --- ");
+
+        var f_min,f_max;
+        f_min = freqs[0];
+        f_max = freqs[1];
+
+        delete fitsDataFreqSupDict[i];
+    }
+
+    mergePlotFreqData2();
+    setBarPlot();
+}
+
+
+var dataFits = [];
+
+$(document).ready(function() {
+
+
+
+
+
+});
+
+
+
+</script>
+</body>
+
+</html>

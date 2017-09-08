@@ -1,0 +1,88 @@
+<nav class="navbar navbar-inverse">
+  <div class="container-fluid">
+    <!-- <div class="navbar-header"> -->
+    <!--   <a class="navbar-brand" href="/">ARTEMIX</a> -->
+    <!-- </div> -->
+    <ul class="nav navbar-nav">
+      <li class="active"><a href="/">Home page</a></li>
+      <!-- <li class="active"><a href="#"><%= title %></a></li> -->
+      <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Tools<span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          <li><a href="/sources">ALMA targets</a></li>
+          <li><a href="/sourceFD" target="_blank">Quick Look Viewer</a></li>
+        </ul>
+      </li>
+
+
+       <% if(pageName === "sources") { %>
+      <li><a class="btn btn-link" data-toggle="modal" data-target="#searchModalId" id="searchId">Search</a></li>
+      <% } %>
+
+
+      <% if(pageName === "sourceFD") { %>
+      <form class="navbar-form navbar-left">
+        <select id="headersList" style="width:200px;">
+          <!-- Dropdown List Option -->
+        </select>
+        <button type="button" class="btn btn-primary btn-sm" id="openModalButton" onclick="openModalButtonClicked()">Open</button>
+      </form>
+
+      <form class="navbar-form navbar-left">
+        <select id="history" style="width:200px;">
+          <!-- Dropdown history of recently visited files  -->
+        </select>
+        <button type="button" class="btn btn-primary btn-sm" id="openVisitedFile" onclick="visitedFileButtonClicked()">Open</button>
+      </form>
+      
+      <% } %>
+      <!--li><button type="button" class="btn btn-link" data-toggle="modal" data-target="#myModal">About</button></li>-->
+      <li><a class="btn btn-link" data-toggle="modal" data-target="#myModal">About</a></li>
+      <li><a href="#">Help</a></li>
+      <% if (user.status == "crew") { %>
+        <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Admin<span class="caret"></span></a>
+          <ul class="dropdown-menu">
+            <li><a href="/userAdmin">Users administration</a></li>
+            <li><a href="/who">Who</a></li>
+          </ul>
+        </li>
+      <% } %>
+    </ul>
+    <ul class="nav navbar-nav navbar-right">
+      <% if (user.email == '_') { %>
+        <li><a href="/login"><span class="glyphicon glyphicon-log-in"></span> Login</a></li>
+      <% } %>
+      <% if (user.email != '_') { %>
+        <li><a href="#"><%= user.email%></a></li>
+        <li><a href="/logout"><span class="glyphicon glyphicon-log-in"></span> Logout</a></li>
+      <% } %>
+    </ul>
+  </div>
+  <!-- Modal -->
+
+  <div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+          <h4 class="modal-title" id="myModalLabel">About ARTEMIX</h4>
+        </div>
+        <div class="modal-body">
+          ARTEMIX is brought to you by Philippe Salome, Levan Loria and Michel Caillat.<br/>
+          Laboratoire d'Etudes du Rayonnement et de la Mati&egrave;re en Astrophysique,<br/>
+          Observatoire de Paris, 61 Avenue de l'Observatoire, 75014 Paris - France<br/><br/>
+
+<b>Usage policy</b><br/>
+The following statement should be included in the acknowledgment of papers using the ALMA datasets : <br/>
+<i>This paper makes use of the following ALMA data: ADS/JAO.ALMA#201X.X.XXXXX.X. ALMA is a partnership of ESO (representing its member states), NSF (USA) and NINS (Japan), together with NRC (Canada) , NSC and ASIAA (Taiwan), and KASI (Republic of Korea), in cooperation with the Republic of Chile. The Joint ALMA Observatory is operated by ESO, AUI/NRAO and NAOJ. The National Radio Astronomy Observatory is a facility of the National Science Foundation operated under cooperative agreement by Associated Universities, Inc.</i> 
+
+<br/><br/>
+Please also add a reference to ARTEMIX :<br/> 
+<i>The data were retrieved from ARTEMIX (http://artemix.obspm.fr) operated by the Observatoire de Paris/LERMA (Salome et al., 2017ASPC..XXX..XXX). This portal gives access to the ALMA Fits files as produced by the ALMA QA2 and extracted from the ALMA archive. ARTEMIX provides a quick look access to the ALMA datacubes as well as a synthetic view of the observation and imaging parameters (positions / frequencies).</i>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>

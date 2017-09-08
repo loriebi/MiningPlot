@@ -1,0 +1,56 @@
+div.container {
+    padding: 0;
+    margin: auto;
+    width: 100%;
+}
+
+div.div1 {
+    float: left;
+    width: 70%;
+}
+
+div.div2 {
+    float: right;
+    width: 30%;
+}
+
+.modal-body  {
+    word-break:break-all
+}
+
+
+.table td{
+    text-align: center;
+}
+.table th{
+    text-align: center;
+}
+
+.table>tbody>tr.active>td {
+    background: #123456;
+    color: #fff;
+}
+
+
+.btn-group {
+    white-space: nowrap;
+}
+.btn-group .btn .btn-success {
+    float: none;
+    display: inline-block;
+}
+.btn + .dropdown-toggle {
+    margin-left: -4px;
+}
+
+.table-responsive{
+    overflow-y: visible !important;
+}
+
+.tr_2d {
+    background-color: cornsilk ;
+}
+
+.tr_3d {
+    background-color: mintcream ;
+}
